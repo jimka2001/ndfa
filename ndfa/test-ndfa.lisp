@@ -20,17 +20,17 @@
 ;; WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
-(defpackage :ndfa.test
+(defpackage :ndfa-test
   (:use :cl :ndfa :lisp-unit))
 
-(in-package :ndfa.test)
+(in-package :ndfa-test)
 
 (defun test ()
   (let ((*print-summary* t)
 	(*print-failures* t)
 	(*summarize-results* t)
 	(*print-errors* t))
-    (run-tests :all (list :ndfa.test))))
+    (run-tests :all :ndfa-test)))
 
 
 
