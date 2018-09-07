@@ -21,16 +21,12 @@
 
 
 (defpackage :ndfa-test
-  (:use :cl :ndfa :lisp-unit))
+  (:use :cl :ndfa :jimka-test))
 
 (in-package :ndfa-test)
 
 (defun test ()
-  (let ((*print-summary* t)
-	(*print-failures* t)
-	(*summarize-results* t)
-	(*print-errors* t))
-    (run-tests :all :ndfa-test)))
+  (run-package-tests :ndfa-test))
 
 
 
