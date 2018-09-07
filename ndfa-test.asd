@@ -22,7 +22,7 @@
 
 (asdf:defsystem :ndfa-test
   :depends-on (:ndfa
-	       (:version :lisp-unit "0.9.0"))
+	       :jimka-test)
   :components
   ((:module "ndfa"
       :components
