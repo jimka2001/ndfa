@@ -135,8 +135,8 @@ will be converted to a png file which will be displayed using open -n.  This wor
 	((string= "png" (pathname-type path))
 	 (let ((dotpath (merge-pathnames (make-pathname :type "dot")  path)))
 	   (ndfa-to-dot ndfa dotpath :state-legend state-legend :transition-legend transition-legend :transition-abrevs transition-abrevs)
-	   (sb-ext:run-program "dot" (list "-Tpng" (namestring dotpath) "-o" (namestring path)) :search t)
+	   (run-program "dot" (list "-Tpng" (namestring dotpath) "-o" (namestring path)))
 	   ;; TODO this only works on the MAC,
-	   (sb-ext:run-program "open" (list "-n" (namestring path)) :search t)))
+	   (run-program "open" (list "-n" (namestring path)))))
 	(t
 	 (error "invalid path ~A" path))))

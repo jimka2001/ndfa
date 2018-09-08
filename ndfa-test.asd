@@ -22,6 +22,7 @@
 
 (asdf:defsystem :ndfa-test
   :depends-on (:ndfa
+	       :jimka-addons
 	       :jimka-test)
   :components
   ((:module "ndfa"
