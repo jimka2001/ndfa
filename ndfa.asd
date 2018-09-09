@@ -21,7 +21,7 @@
 
 
 (asdf:defsystem :ndfa
-  :depends-on ()
+  :depends-on (:jimka-addons)
   :components
   ((:module "ndfa"
     :components
