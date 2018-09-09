@@ -20,7 +20,7 @@
 ;; WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 (defpackage :non-deterministic-finite-automata
-  (:use :cl)
+  (:use :cl :jimka-addons)
   (:nicknames "NDFA")
   (:export "MAKE-NDFA"
 	   "STATE-MACHINE"
@@ -277,24 +277,6 @@ the ADD-STATE function."
     (dolist (state-designator state-designators)
       (apply #'add-state ndfa state-designator))
     ndfa))
-
-(defun lconc (buf items)
-  (cond
-    ((null buf)
-     (cons items (last items)))
-    ((null (car buf))
-     (setf (car buf) items)
-     (setf (cdr buf) (last items))
-     buf)
-    ((null items)
-     buf)
-    (t
-     (setf (cdr (cdr buf)) items)
-     (setf (cdr buf) (last items))
-     buf)))
-
-(defun tconc (buf &rest items)
-  (lconc buf items))
 
 (defun trim-state-machine (dfa)
   "Remove all states from the state machine which have no path to a final state"
