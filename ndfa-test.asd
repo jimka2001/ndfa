@@ -21,6 +21,9 @@
 
 
 (asdf:defsystem :ndfa-test
+  :version "1.0"
+  :description ""
+  :license ""
   :depends-on (:ndfa
 	       :jimka-addons
 	       :jimka-test)

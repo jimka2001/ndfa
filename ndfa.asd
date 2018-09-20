@@ -21,6 +21,9 @@
 
 
 (asdf:defsystem :ndfa
+  :version "1.0"
+  :description ""
+  :license ""
   :depends-on (:jimka-addons)
   :components
   ((:module "ndfa"
