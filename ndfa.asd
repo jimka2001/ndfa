@@ -22,7 +22,7 @@
 
 (asdf:defsystem :ndfa
   :version "1.0"
-  :description ""
+  :description "Implementation of non-deterministed finite automata"
   :license "MIT"
   :depends-on (:jimka-addons)
   :components

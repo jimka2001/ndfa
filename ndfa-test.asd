@@ -22,7 +22,7 @@
 
 (asdf:defsystem :ndfa-test
   :version "1.0"
-  :description ""
+  :description "Test cases for ndfa package/system"
   :license ""
   :depends-on (:ndfa
 	       :jimka-addons
