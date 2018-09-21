@@ -20,13 +20,14 @@
 ;; WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
-(asdf:defsystem :ndfa
+(asdf:defsystem :ndfa-test
   :version "1.0"
-  :description "Implementation of non-deterministed finite automata"
-  :license "MIT"
-  :depends-on (:adjuvant)
+  :description "Test cases for ndfa package/system"
+  :license ""
+  :depends-on (:ndfa
+	       :adjuvant
+	       :scrutiny)
   :components
-  ((:module "ndfa"
-    :components
-    ((:file "ndfa")
-     (:file "ndfa-to-dot" :depends-on ("ndfa"))))))
+  ((:module "src"
+      :components
+      ((:file "test-ndfa")))))
