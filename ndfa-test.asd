@@ -25,7 +25,7 @@
   :description "Test cases for ndfa package/system"
   :license ""
   :depends-on (:ndfa
-	       :jimka-addons
+	       :adjuvant
 	       :scrutiny)
   :components
   ((:module "ndfa"

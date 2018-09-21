@@ -20,7 +20,7 @@
 ;; WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 (defpackage :non-deterministic-finite-automata
-  (:use :cl :jimka-addons)
+  (:use :cl :adjuvant)
   (:nicknames "NDFA")
   (:export "MAKE-NDFA"
 	   "STATE-MACHINE"

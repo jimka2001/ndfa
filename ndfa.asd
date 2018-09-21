@@ -24,7 +24,7 @@
   :version "1.0"
   :description "Implementation of non-deterministed finite automata"
   :license "MIT"
-  :depends-on (:jimka-addons)
+  :depends-on (:adjuvant)
   :components
   ((:module "ndfa"
     :components
