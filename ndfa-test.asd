@@ -26,7 +26,7 @@
   :license ""
   :depends-on (:ndfa
 	       :jimka-addons
-	       :jimka-test)
+	       :scrutiny)
   :components
   ((:module "ndfa"
       :components

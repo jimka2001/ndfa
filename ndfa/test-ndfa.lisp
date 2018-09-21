@@ -21,7 +21,7 @@
 
 
 (defpackage :ndfa-test
-  (:use :cl :ndfa :jimka-test))
+  (:use :cl :ndfa :scrutiny))
 
 (in-package :ndfa-test)
 
