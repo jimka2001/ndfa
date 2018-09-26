@@ -31,37 +31,37 @@
 
 
 (define-test ndfa/test1
-  (let ((sm (make-instance 'ndfa:state-machine :key #'evenp)))
-    (ndfa:add-state sm :label 'a
+  (let ((sm (make-instance 'state-machine :key #'evenp)))
+    (add-state sm :label 'a
 		       :initial-p t
 		       :transitions `((:next-label b :transition-label t)
 				      (:next-label c :transition-label nil)))
-    (assert-true (ndfa::states sm))
-    (ndfa:add-state sm :label 'b
+    (assert-true (states sm))
+    (add-state sm :label 'b
 		       :final-p t
 		       :initial-p t
 		       :transitions `((:next-label c :transition-label t)
 				      (:next-label b :transition-label nil)))
-    (ndfa:add-state sm :label 'c
+    (add-state sm :label 'c
 		       :transitions `((:next-label b :transition-label t)
 				      (:next-label c :transition-label nil)))
     (with-output-to-string (str)
-      (dolist (state (ndfa::states sm))
-	(dolist (transition (ndfa::transitions state))
-	  (princ (ndfa::next-state transition) str))))
-    (mapcar #'ndfa::transitions (ndfa::states sm))
-    (assert-true (ndfa::get-initial-states sm))
-    (assert-true (= 2 (length (ndfa::get-initial-states sm))))
+      (dolist (state (states sm))
+	(dolist (transition (transitions state))
+	  (princ (next-state transition) str))))
+    (mapcar #'transitions (states sm))
+    (assert-true (get-initial-states sm))
+    (assert-true (= 2 (length (get-initial-states sm))))
 
-    (assert-true (ndfa::get-initial-states sm))
-    (ndfa:perform-transitions sm '(1))
-    (ndfa:perform-transitions sm '(1 2))
-    (ndfa:perform-transitions sm #(1 2 3))
+    (assert-true (get-initial-states sm))
+    (perform-transitions sm '(1))
+    (perform-transitions sm '(1 2))
+    (perform-transitions sm #(1 2 3))
     ))
 
 
 (define-test ndfa/test2
-  (let ((sm (ndfa:make-ndfa `((:label a
+  (let ((sm (make-ndfa `((:label a
 			  :initial-p t
 			  :transitions ((:next-label b :transition-label 0)
 					(:next-label c :transition-label 1)))
@@ -78,15 +78,15 @@
 				   (and (oddp  label) (oddp input-element)))))))
   
     (with-output-to-string (str)
-      (dolist (state (ndfa::states sm))
-	(dolist (transition (ndfa::transitions state))
-	  (princ (ndfa::next-state transition) str))))
-    (mapcar #'ndfa::transitions (ndfa::states sm))
-    (assert-true (ndfa::get-initial-states sm))
-    (assert-true (= 2 (length (ndfa::get-initial-states sm))))
-    (assert-true (ndfa::get-initial-states sm))
+      (dolist (state (states sm))
+	(dolist (transition (transitions state))
+	  (princ (next-state transition) str))))
+    (mapcar #'transitions (states sm))
+    (assert-true (get-initial-states sm))
+    (assert-true (= 2 (length (get-initial-states sm))))
+    (assert-true (get-initial-states sm))
   
-    (ndfa:perform-transitions sm '(1))
-    (ndfa:perform-transitions sm '(1 2))
-    (ndfa:perform-transitions sm #(1 2 3 4))
+    (perform-transitions sm '(1))
+    (perform-transitions sm '(1 2))
+    (perform-transitions sm #(1 2 3 4))
     ))
