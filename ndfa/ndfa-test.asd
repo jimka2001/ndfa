@@ -22,6 +22,7 @@
 
 (asdf:defsystem :ndfa-test
   :version "1.0"
+  :author "Jim Newton"
   :description "Test cases for ndfa package/system"
   :license ""
   :depends-on (:ndfa

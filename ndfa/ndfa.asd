@@ -22,6 +22,7 @@
 
 (asdf:defsystem :ndfa
   :version "1.0"
+  :author "Jim Newton"
   :description "Implementation of non-deterministed finite automata"
   :license "MIT"
   :depends-on (:adjuvant)
