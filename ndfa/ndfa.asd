@@ -21,7 +21,7 @@
 
 
 (asdf:defsystem :ndfa
-  :version "1.0"
+  :version (:read-file-form "../version.lisp")
   :author "Jim Newton"
   :description "Implementation of non-deterministed finite automata"
   :license "MIT"
