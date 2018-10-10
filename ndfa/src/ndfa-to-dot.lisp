@@ -1,4 +1,4 @@
-;; Copyright (c) 2016 EPITA Research and Development Laboratory
+;; Copyright (c) 2016,18 EPITA Research and Development Laboratory
 ;;
 ;; Permission is hereby granted, free of charge, to any person obtaining
 ;; a copy of this software and associated documentation
@@ -135,8 +135,7 @@ will be converted to a png file which will be displayed using open -n.  This wor
 	((string= "png" (pathname-type path))
 	 (let ((dotpath (merge-pathnames (make-pathname :type "dot")  path)))
 	   (ndfa-to-dot ndfa dotpath :state-legend state-legend :transition-legend transition-legend :transition-abrevs transition-abrevs)
-	   (run-program "dot" (list "-Tpng" (namestring dotpath) "-o" (namestring path)))
-	   ;; TODO this only works on the MAC,
-	   (run-program "open" (list "-n" (namestring path)))))
+	   (run-program *dot-path* (list "-Tpng" (namestring dotpath) "-o" (namestring path)))
+	   #+:os-macosx (run-program "open" (list "-n" (namestring path)))))
 	(t
 	 (error "invalid path ~A" path))))
