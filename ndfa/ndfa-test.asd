@@ -24,7 +24,7 @@
   :version (:read-file-form "../version.lisp")
   :author "Jim Newton"
   :description "Test cases for ndfa package/system"
-  :license ""
+  :license "MIT"
   :depends-on (:ndfa
 	       :adjuvant
 	       :scrutiny)
