@@ -244,10 +244,7 @@ Note, that the state indicated by NEXT-LABEL might not yet exist."
 		(and (eql (next-label transition) next-label)
 		     (funcall equal-label transition-label (transition-label transition))))
 	      (transitions state)))
-    ;; if a transition exists either with the label or next state, the error
-    ((exists transition (transitions state)
-       (eql (next-label transition) next-label))
-     (error "a transition already exists from ~A to ~A~%" state next-label))
+    ;; if a transition already exists the label then error
     ((exists transition (transitions state)
        (funcall equal-label transition-label (transition-label transition)))
      (error "a transition already exists with label ~A~%" transition-label))
