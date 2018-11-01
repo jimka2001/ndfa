@@ -188,7 +188,7 @@ This method lazily sets the NEXT slot of SELF to the STATE slot to that state."
   "Given a list of STARTING-STATES, each of which is an element of (states NDFA), 
 perform the transitions indicated by INPUT-SEQUENCE, i.e., iterate through the
 STARTING-STATES, and on each element generate a list of next-states, as a function of
-the existing transistions on the state.  Some of the transitions will lead to a next state
+the existing transitions on the state.  Some of the transitions will lead to a next state
 and some won't; collect a list of such 'successful' next-states.  On this new list of states,
 perform the same algorithm on the next element of the INPUT-SEQUENCE, and repeat until the
 INPUT-SEQUENCE is depleted.  Return the list of resulting states.
@@ -225,7 +225,7 @@ nor no further element fo the input-sequence is considered."
 (defmethod perform-transitions ((ndfa state-machine) input-sequence)
   "Returns a list of states which are reached by the following process:
 Start with the list/set of all initial states of the state-maching NDFA.
-Iterate through the INPUT-SEQUENCE, performing all the applicable transistions.
+Iterate through the INPUT-SEQUENCE, performing all the applicable transitions.
 If the list of states becomes empty, return NIL.
 Otherwise the set of states reached is returned.
 None, some, or all of these states might be final states of the state machine."
