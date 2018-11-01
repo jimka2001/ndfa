@@ -129,15 +129,18 @@ TRANSITION-ABREVS (a car/cadr alist) mapping type specifiers to symbolic labels.
 
 (defmethod ndfa-to-dot :around (ndfa (path string) &rest args)
   (apply #'ndfa-to-dot ndfa (pathname path) args))
+
+(defmethod ndfa-to-dot ((ndfa state-machine) (path pathname) &key (state-legend :dot) (transition-legend nil) transition-abrevs (view nil))
+  "Calling NDFA-TO-DOT with a PATH whose type is \"dot\" creates the dot file, which is valid input for the
 graphviz dot program.   If PATH has type \"png\", a temporary dot file will be created, and
 will be converted to a png file which will be displayed using open -n.  This works for MAC only."
   (cond ((string= "dot" (pathname-type path))
 	 (with-open-file (stream path :direction :output :if-exists :rename)
-	   (ndfa-to-dot ndfa stream :state-legend state-legend :transition-legend transition-legend :transition-abrevs transition-abrevs)))
+	   (ndfa-to-dot ndfa stream :state-legend state-legend :transition-legend transition-legend :transition-abrevs transition-abrevs :view nil)))
 	((string= "png" (pathname-type path))
 	 (let ((dotpath (merge-pathnames (make-pathname :type "dot")  path)))
-	   (ndfa-to-dot ndfa dotpath :state-legend state-legend :transition-legend transition-legend :transition-abrevs transition-abrevs)
+	   (ndfa-to-dot ndfa dotpath :state-legend state-legend :transition-legend transition-legend :transition-abrevs transition-abrevs :view nil)
 	   (run-program *dot-path* (list "-Tpng" (namestring dotpath) "-o" (namestring path)))
-	   #+:os-macosx (run-program "open" (list "-n" (namestring path)))))
+	   #+:os-macosx (when view (run-program "open" (list "-n" (namestring path))))))
 	(t
 	 (error "invalid path ~A" path))))
