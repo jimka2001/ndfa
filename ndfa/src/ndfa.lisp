@@ -354,14 +354,11 @@ RETURNS the given DFA perhaps after having some if its states removed."
   (remove-non-accessible-states dfa)
   (remove-non-coaccessible-states dfa))
 
-(defun default-transition-combine (label1 label2)
-  (error "cannot combine labels ~A and ~A" label1 label2))
-
-(defun reduce-state-machine (dfa &key (combine #'default-transition-combine) (equal-labels #'eql))
-  "COMBINE is a binary function which takes two transition labels and returns a new label representing
+(defun reduce-state-machine (dfa &key (combine nil) (equal-labels #'eql))
+  "COMBINE is either nil or a binary function which takes two transition labels and returns a new label representing
  the combination of the two given."
   (declare (type state-machine dfa)
-	   (type (function (t t) t) combine))
+	   (type (or null (function (t t) t)) combine))
   (trim-state-machine dfa)
   (let ((partitions (list (set-difference (states dfa) (get-final-states dfa))
 			  (get-final-states dfa))))
@@ -372,30 +369,38 @@ RETURNS the given DFA perhaps after having some if its states removed."
 			   (member state partition :test #'eq)))))
 	     (partition-transition (state)
 	       (mapcar (lambda (transition)
-			 (list  :from state :with (transition-label transition) :to (find-partition (next-state transition))))
+			 (list  :with (transition-label transition) :to (find-partition (next-state transition))))
 		       (transitions state)))
 	     (refine-partition (partition)
-	       (format t "partition = ~A~%" partition)
-	       (format t "mapped = ~A~%" (mapcar #'partition-transition partition))
-	       (let ((characterization (group-by (mapcan #'partition-transition partition)
-						 :key (getter :to)
-						 :test #'eq)))
-		 ;; characterization is a car/cadr alist mapping mapping each partition to a list of plists
-		 ;; each plist looks like (:from ... :with ... :to :to ...) where all the :to's are identical an eq to the assoc key
-		 (format t "characterization=~A~%" characterization)
-		 (if (null (cdr characterization))
-		     ;; partition ok, not splittable
-		     (list partition)
-		     (loop :for grouped-by-to :in characterization
-			   :collect (destructuring-bind (_partition plists) grouped-by-to
-				      (declare (ignore _partition))
-				      (remove-duplicates (mapcar (getter :from) plists)))))))
+	       ;; partition is a list of states
+	       (let ((characterization (group-by partition
+						 :key #'partition-transition
+						 :test (lambda (plist1 plist2)
+							 (and (eq (getf plist1 :to)
+								  (getf plist2 :to))
+							      (funcall equal-labels
+								       (getf plist1 :with)
+								       (getf plist2 :with)))))))
+		 ;; characterization is a car/cadr alist mapping a plist to a list of states which is a subset of partition
+		 ;; plist looks like ( :with ...  :to ...)
+		 (loop :for grouped-by-transitions :in characterization
+		       :collect (destructuring-bind (_plist equiv-states) grouped-by-transitions
+				  (declare (ignore _plist))
+				  ;; this call to SETOF creates a list with the same elements as equiv-states,
+				  ;;   but so that they are order in the same order as they are found
+				  ;;   in (STATES DFA).  This is so that FIXED-POINT can depend on the order
+				  ;;   and recognize when the same value has been returned twice from REFINE-PARTITIONS.
+				  (setof state (states dfa)
+				    (member state equiv-states :test #'eq))))))
 	     (refine-partitions (p)
 	       (format t "p = ~A~%" p)
 	       (setf partitions (mapcan #'refine-partition p))))
 	
       (fixed-point #'refine-partitions
-		   partitions))))
+		   partitions)
+
+      ;; now need to build new state machine, and combine parallel transitions using the COMBINE function
+      )))
 
 
 

@@ -57,6 +57,27 @@
 			   :transitions ((:next-label 4 :transition-label t6)))))))
     ;; TODO add assertion
     (reduce-state-machine dfa)))
+
+(define-test ndfa/test-reduce-3
+  (let ((dfa (make-ndfa '((:label A
+			   :initial-p t
+			   :transitions ((:next-label B :transition-label 0)
+					 (:next-label C :transition-label 1)))
+			  (:label B
+			   :transitions ((:next-label B :transition-label 0)
+					 (:next-label D :transition-label 1)))
+			  (:label C
+			   :transitions ((:next-label B :transition-label 0)
+					 (:next-label C :transition-label 1)))
+			  (:label D
+			   :transitions ((:next-label B :transition-label 0)
+					 (:next-label E :transition-label 1)))
+			  (:label E
+			   :final-p t
+			   :transitions ((:next-label B :transition-label 0)
+					 (:next-label C :transition-label 1)))))))
+    ;; TODO add assertion
+    (reduce-state-machine dfa)))
   
 
 (define-test ndfa/test-trim-1
