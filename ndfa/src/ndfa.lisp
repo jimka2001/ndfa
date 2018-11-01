@@ -22,26 +22,26 @@
 (defpackage :non-deterministic-finite-automata
   (:use :cl :adjuvant)
   (:nicknames "NDFA")
-  (:export "MAKE-NDFA"
-	   "STATE-MACHINE"
+  (:export "ADD-STATE"
 	   "DETERMINISTICP"
-	   "STATE-NAME"
-	   "STATE-FINAL-P"
-	   "STATE-LABEL"
-	   "STATE-STICKY-P"
+	   "GET-FINAL-STATES"
+	   "GET-INITIAL-STATES"
+	   "GET-STICKY-STATES"
+	   "NDFA-TO-DOT"
 	   "NEXT-LABEL"
 	   "NEXT-STATE"
-	   "ADD-STATE"
-	   "NDFA-TO-DOT"
-	   "TRANSITIONS"
-	   "TRANSITION-LABEL"
-	   "STATES"
-	   "GET-INITIAL-STATES"
-	   "GET-FINAL-STATES"
-	   "GET-STICKY-STATES"
-	   "TRIM-STATE-MACHINE"
+	   "PERFORM-SOME-TRANSITIONS"
 	   "PERFORM-TRANSITIONS"
-	   "PERFORM-SOME-TRANSITIONS"))
+	   "STATE-FINAL-P"
+	   "STATE-LABEL"
+	   "STATE-MACHINE"
+	   "STATE-NAME"
+	   "STATE-STICKY-P"
+	   "STATES"
+	   "TRANSITION-LABEL"
+	   "TRANSITIONS"
+	   "TRIM-STATE-MACHINE"
+	   "MAKE-NDFA" ))
 
 (in-package :ndfa)
 
