@@ -1,4 +1,4 @@
-;; Copyright (c) 2016 EPITA Research and Development Laboratory
+;; Copyright (c) 2016,2018 EPITA Research and Development Laboratory
 ;;
 ;; Permission is hereby granted, free of charge, to any person obtaining
 ;; a copy of this software and associated documentation
@@ -233,13 +233,27 @@ None, some, or all of these states might be final states of the state machine."
   (declare (type sequence input-sequence))
   (perform-some-transitions ndfa (get-initial-states ndfa) input-sequence))
 
-(defgeneric add-transition (state &key next-label transition-label))
+(defgeneric add-transition (state &key next-label transition-label equal-label))
 
-(defmethod add-transition ((state state) &key next-label transition-label)
+(defmethod add-transition ((state state) &key next-label transition-label (equal-label #'eql))
   "Create and return an instance of TRANSITION from STATE to the state designated by NEXT-LABEL.
 Note, that the state indicated by NEXT-LABEL might not yet exist."
-  (car (push (make-instance 'transition :state state :next-label next-label :transition-label transition-label)
-	     (transitions state))))
+  (cond
+    ;; if such a transition already exists, then just return it without creating a new one
+    ((find-if (lambda (transition)
+		(and (eql (next-label transition) next-label)
+		     (funcall equal-label transition-label (transition-label transition))))
+	      (transitions state)))
+    ;; if a transition exists either with the label or next state, the error
+    ((exists transition (transitions state)
+       (eql (next-label transition) next-label))
+     (error "a transition already exists from ~A to ~A~%" state next-label))
+    ((exists transition (transitions state)
+       (funcall equal-label transition-label (transition-label transition)))
+     (error "a transition already exists with label ~A~%" transition-label))
+    (t
+     (car (push (make-instance 'transition :state state :next-label next-label :transition-label transition-label)
+		(transitions state))))))
 
 (defgeneric add-state (object &key label initial-p final-p transitions))
 
