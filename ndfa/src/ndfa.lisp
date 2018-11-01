@@ -375,23 +375,30 @@ RETURNS the given DFA perhaps after having some if its states removed."
 			  (get-final-states dfa))))
 
     (labels ((find-partition (state)
+	       (declare (type state state))
 	       (the cons
 		    (car (exists partition partitions
 			   (member state partition :test #'eq)))))
 	     (partition-transition (state)
+	       (declare (type state state))
 	       (mapcar (lambda (transition)
+			 (declare (type transition transition))
 			 (list  :with (transition-label transition) :to (find-partition (next-state transition))))
 		       (transitions state)))
+	     (plist-equal (plist1 plist2)
+	       (declare (type (cons keyword cons) plist1 plist2))
+	       (and (eq (getf plist1 :to)
+			(getf plist2 :to))
+		    (funcall equal-labels
+			     (getf plist1 :with)
+			     (getf plist2 :with))))
 	     (refine-partition (partition)
 	       ;; partition is a list of states
 	       (let ((characterization (group-by partition
 						 :key #'partition-transition
-						 :test (lambda (plist1 plist2)
-							 (and (eq (getf plist1 :to)
-								  (getf plist2 :to))
-							      (funcall equal-labels
-								       (getf plist1 :with)
-								       (getf plist2 :with)))))))
+						 :test (lambda (plists1 plists2)
+							 (not (set-exclusive-or plists1 plists2
+										:test #'plist-equal))))))
 		 ;; characterization is a car/cadr alist mapping a plist to a list of states which is a subset of partition
 		 ;; plist looks like ( :with ...  :to ...)
 		 (loop :for grouped-by-transitions :in characterization
