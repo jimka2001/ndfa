@@ -28,23 +28,35 @@
 (defun test ()
   (run-package-tests :ndfa-test))
 
+(define-test ndfa/test-trim-1
+  (let ((dfa (make-ndfa '((:label a :initial-p t)
+			  (:label b :final-p t)))))
+    (assert-true (= 0 (length (states (trim-state-machine dfa))))))  )
 
+(define-test ndfa/test-trim-2
+
+  (let ((dfa (make-ndfa '((:label i :initial-p t :transitions ((:next-label m :transition-label 1)))
+			  (:label m :transitions ((:next-label f :transition-label 1)))
+			  (:label f :final-p t)))))
+    (assert-true (= 3 (length (states (trim-state-machine dfa))))))
+
+  )
 
 (define-test ndfa/test1
   (let ((sm (make-instance 'state-machine :key #'evenp)))
     (add-state sm :label 'a
-		       :initial-p t
-		       :transitions `((:next-label b :transition-label t)
-				      (:next-label c :transition-label nil)))
+		  :initial-p t
+		  :transitions `((:next-label b :transition-label t)
+				 (:next-label c :transition-label nil)))
     (assert-true (states sm))
     (add-state sm :label 'b
-		       :final-p t
-		       :initial-p t
-		       :transitions `((:next-label c :transition-label t)
-				      (:next-label b :transition-label nil)))
+		  :final-p t
+		  :initial-p t
+		  :transitions `((:next-label c :transition-label t)
+				 (:next-label b :transition-label nil)))
     (add-state sm :label 'c
-		       :transitions `((:next-label b :transition-label t)
-				      (:next-label c :transition-label nil)))
+		  :transitions `((:next-label b :transition-label t)
+				 (:next-label c :transition-label nil)))
     (with-output-to-string (str)
       (dolist (state (states sm))
 	(dolist (transition (transitions state))

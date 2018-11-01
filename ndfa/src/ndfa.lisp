@@ -278,7 +278,24 @@ the ADD-STATE function."
       (apply #'add-state ndfa state-designator))
     ndfa))
 
-(defun trim-state-machine (dfa)
+(defun remove-invalid-states (dfa valid-states)
+  "Remove all states from (states dfa), (get-final-states dfa), and (get-initial-states dfa)
+which are not in VALID-STATES."
+  (declare (type state-machine dfa)
+	   (type list valid-states))
+  (setf (states dfa)
+	(intersection (states dfa) valid-states)
+
+	(get-final-states dfa)
+	(intersection (get-final-states dfa)
+		      valid-states)
+
+	(get-initial-states dfa)
+	(intersection (get-initial-states dfa)
+		      valid-states))
+  dfa)
+
+(defun remove-non-coaccessible-states (dfa)
   "Remove all states from the state machine which have no path to a final state"
   (declare (type state-machine dfa))
   (let ((buf (list nil))
@@ -296,20 +313,42 @@ the ADD-STATE function."
 	      (pushnew state (cdr (assoc target reverse-assoc)))
 	      (push (list target state) reverse-assoc)))))
 
-    (dolist (target (car buf))
+    (dolist-tconc (target buf)
       (dolist (before (cdr (assoc target reverse-assoc)))
 	(unless (member before (car buf))
 	  (tconc buf before))))
-    
-    (setf (states dfa)
-	  (intersection (states dfa) (car buf))
 
-	  (get-final-states dfa)
-	  (intersection (get-final-states dfa)
-			(car buf))
+    ;; a state in a state machine is called co-accessible if there is
+    ;; a path from it to a final state.
+    ;; We have collected in (car buf) the list of co-accessible states.
+    ;; So states not in (car buf) are not co-accessible.
+    ;; Now we remove such non-co-accessible states from (states dfa)
+    ;; from (get-final-states dfa) and also from (get-initial-states dfa).
+    (remove-invalid-states dfa (car buf))))
 
-	  (get-initial-states dfa)
-	  (intersection (get-initial-states dfa)
-			(car buf))))
-  dfa)
-	   
+(defun remove-non-accessible-states (dfa)
+  "Remove all states from the state machine which no path from any initial state."
+  (declare (type state-machine dfa))
+  ;; first we find all the accessible states by tracing from the initial states as far as possible.
+  ;; everything not collected this way is non-accessible.
+  (let ((buf (list nil)))
+    (dolist (f (get-initial-states dfa))
+      (tconc buf f))
+    (dolist-tconc (source-state buf)
+      (dolist (transition (transitions source-state))
+	(unless (member (next-state transition) (car buf))
+	  (tconc buf (next-state transition)))))
+    ;; a state in a state machine is called accessible if there is
+    ;; a path from some initial state to it.
+    ;; We have collected in (car buf) the list of accessible states.
+    ;; So states not in (car buf) are not accessible.
+    ;; Now we remove such non-accessible states from (states dfa)
+    ;; from (get-final-states dfa) and also from (get-initial-states dfa).
+    (remove-invalid-states dfa (car buf))))
+
+(defun trim-state-machine (dfa)
+  "Trim a state machine.  This means if any state has no path to a final state, then remove
+it; and if any state is not reachable from an inital state, then remove it.
+RETURNS the given DFA perhaps after having some if its states removed."
+  (remove-non-accessible-states dfa)
+  (remove-non-coaccessible-states dfa))
