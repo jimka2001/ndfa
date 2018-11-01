@@ -32,6 +32,7 @@
 	   "NEXT-STATE"
 	   "PERFORM-SOME-TRANSITIONS"
 	   "PERFORM-TRANSITIONS"
+	   "REDUCE-STATE-MACHINE"
 	   "STATE-FINAL-P"
 	   "STATE-LABEL"
 	   "STATE-MACHINE"
@@ -352,3 +353,51 @@ it; and if any state is not reachable from an inital state, then remove it.
 RETURNS the given DFA perhaps after having some if its states removed."
   (remove-non-accessible-states dfa)
   (remove-non-coaccessible-states dfa))
+
+(defun default-transition-combine (label1 label2)
+  (error "cannot combine labels ~A and ~A" label1 label2))
+
+(defun reduce-state-machine (dfa &key (combine #'default-transition-combine) (equal-labels #'eql))
+  "COMBINE is a binary function which takes two transition labels and returns a new label representing
+ the combination of the two given."
+  (declare (type state-machine dfa)
+	   (type (function (t t) t) combine))
+  (trim-state-machine dfa)
+  (let ((partitions (list (set-difference (states dfa) (get-final-states dfa))
+			  (get-final-states dfa))))
+
+    (labels ((find-partition (state)
+	       (the cons
+		    (car (exists partition partitions
+			   (member state partition :test #'eq)))))
+	     (partition-transition (state)
+	       (mapcar (lambda (transition)
+			 (list  :from state :with (transition-label transition) :to (find-partition (next-state transition))))
+		       (transitions state)))
+	     (refine-partition (partition)
+	       (format t "partition = ~A~%" partition)
+	       (format t "mapped = ~A~%" (mapcar #'partition-transition partition))
+	       (let ((characterization (group-by (mapcan #'partition-transition partition)
+						 :key (getter :to)
+						 :test #'eq)))
+		 ;; characterization is a car/cadr alist mapping mapping each partition to a list of plists
+		 ;; each plist looks like (:from ... :with ... :to :to ...) where all the :to's are identical an eq to the assoc key
+		 (format t "characterization=~A~%" characterization)
+		 (if (null (cdr characterization))
+		     ;; partition ok, not splittable
+		     (list partition)
+		     (loop :for grouped-by-to :in characterization
+			   :collect (destructuring-bind (_partition plists) grouped-by-to
+				      (declare (ignore _partition))
+				      (remove-duplicates (mapcar (getter :from) plists)))))))
+	     (refine-partitions (p)
+	       (format t "p = ~A~%" p)
+	       (setf partitions (mapcan #'refine-partition p))))
+	
+      (fixed-point #'refine-partitions
+		   partitions))))
+
+
+
+
+		  

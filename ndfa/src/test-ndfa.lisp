@@ -28,6 +28,37 @@
 (defun test ()
   (run-package-tests :ndfa-test))
 
+(define-test ndfa/test-reduce-1
+  (let ((dfa (make-ndfa '((:label i :initial-p t
+			   :transitions ((:next-label 1 :transition-label fixnum)
+					 (:next-label 2 :transition-label (and number (not fixnum)))))
+			  (:label f :final-p t)
+			  (:label 1
+			   :transitions ((:next-label f :transition-label number)))
+			  (:label 2
+			   :transitions ((:next-label f :transition-label number)))))))
+    (assert-true (= 3 (length (states (reduce-state-machine dfa)))))))
+
+(define-test ndfa/test-reduce-2
+  (let ((dfa (make-ndfa '((:label 0 :initial-p t
+			   :transitions ((:next-label 6 :transition-label t1)
+					 (:next-label 1 :transition-label t2)))
+			  (:label 4 :final-p t)
+			  (:label 1
+			   :transitions ((:next-label 2 :transition-label t3)))
+			  (:label 6
+			   :transitions ((:next-label 2 :transition-label t3)))
+			  (:label 2
+			   :transitions ((:next-label 3 :transition-label t4)
+					 (:next-label 5 :transition-label t5)))
+			  (:label 3
+			   :transitions ((:next-label 4 :transition-label t6)))
+			  (:label 5
+			   :transitions ((:next-label 4 :transition-label t6)))))))
+    ;; TODO add assertion
+    (reduce-state-machine dfa)))
+  
+
 (define-test ndfa/test-trim-1
   (let ((dfa (make-ndfa '((:label a :initial-p t)
 			  (:label b :final-p t)))))
