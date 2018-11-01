@@ -21,9 +21,9 @@
 
 (in-package :ndfa)
 
-(defgeneric ndfa-to-dot (object stream &rest others &key state-legend transition-legend transition-abrevs))
+(defgeneric ndfa-to-dot (object stream &rest others &key state-legend transition-legend transition-abrevs view))
 
-(defmethod ndfa-to-dot ((ndfa state-machine) stream &key (state-legend :dot) (transition-legend nil) transition-abrevs)
+(defmethod ndfa-to-dot ((ndfa state-machine) stream &key (state-legend :dot) (transition-legend nil) transition-abrevs (view nil))
   "Generate a dot file (for use by graphviz).  The dot file illustrates the states
 and and transitions of the NDFA state machine.  The dot file is written to STREAM
 which may be any valid first argument of FORMAT, but is usually t or a stream object.
@@ -32,6 +32,8 @@ TRANSITION-ABREVS (a car/cadr alist) mapping type specifiers to symbolic labels.
    then the name indicated in TRANSITION-ABREVS is used, otherwise a new symbolic name
    is generated.   This feature allows you to create multiple NDFA graphs using the
    same state transition lablels."
+  (declare (ignore view)
+	   (type (or (member t nil) stream)))
   (flet ((stringify (data)
 	   (cond ((null data)
 		  nil)
@@ -125,8 +127,8 @@ TRANSITION-ABREVS (a car/cadr alist) mapping type specifiers to symbolic labels.
       
       (format stream "}~%"))))
 
-(defmethod ndfa-to-dot ((ndfa state-machine) (path pathname) &key (state-legend :dot) (transition-legend nil) transition-abrevs)
-  "Calling NDFA-TO-DOT with a PATH whose type is \"dot\" creates the dot file, which is input for the
+(defmethod ndfa-to-dot :around (ndfa (path string) &rest args)
+  (apply #'ndfa-to-dot ndfa (pathname path) args))
 graphviz dot program.   If PATH has type \"png\", a temporary dot file will be created, and
 will be converted to a png file which will be displayed using open -n.  This works for MAC only."
   (cond ((string= "dot" (pathname-type path))
