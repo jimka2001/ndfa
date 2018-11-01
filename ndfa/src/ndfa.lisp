@@ -404,16 +404,58 @@ RETURNS the given DFA perhaps after having some if its states removed."
 				  (setof state (states dfa)
 				    (member state equiv-states :test #'eq))))))
 	     (refine-partitions (p)
-	       (format t "p = ~A~%" p)
 	       (setf partitions (mapcan #'refine-partition p))))
 	
       (fixed-point #'refine-partitions
 		   partitions)
 
-      ;; now need to build new state machine, and combine parallel transitions using the COMBINE function
-      )))
-
-
-
-
-		  
+      ;; now build new state machine, and combine parallel transitions using the COMBINE function
+      (let* ((reduced-dfa (make-instance (class-of dfa)))
+	     (new-state->equiv-class 
+	       ;; add new states to reduced-dfa
+	       (loop :for equiv-class :in partitions
+		     :collect (cons (add-state reduced-dfa
+					       :label (state-label (car equiv-class))
+					       :initial-p (if (exists state equiv-class
+								(state-initial-p state))
+							      t nil)
+					       :final-p   (if (exists state equiv-class
+								(state-final-p state))
+							      t nil))
+				    equiv-class))))
+	
+	;; add transitions to each state
+	(loop :for (from-state . from-equiv-class) :in new-state->equiv-class
+	      ;; collect all the transistions from this from-equiv-class
+	      ;; and group them by equiv-class of next state
+	      :for transitions = (mapcan (lambda (old-state)
+					   (copy-list (transitions old-state))) from-equiv-class)
+	      :for grouped-by-destination = (group-by transitions
+						      :key (lambda (transition)
+							     (find-partition (next-state transition)))
+						      :test #'eq)
+	      :do (loop :for pair :in grouped-by-destination
+			:for to-equiv-class = (car pair)
+			:for to-label = (state-label (car to-equiv-class))
+			:for transitions = (remove-duplicates (cadr pair)
+							      :key #'transition-label
+							      :test equal-labels)
+			:do (if combine
+				;; duplicate transition labels have already been removed, but
+				;;   we still need to compile labels which are different.
+				;;   e.g., number + string = (or number string)
+				;;   e.g., fixnum + (and number (not fixnum)) = number
+				(add-transition from-state
+						:equal-label equal-labels
+						:transition-label (reduce combine (mapcar #'transition-label transitions)
+									  :initial-value (transition-label (car transitions)))
+						:next-label to-label)
+				;; otherwise, make several transitions between the same two states,
+				;; each with a different transition label
+				(dolist (transition transitions)
+				  (add-transition from-state
+						  :equal-label equal-labels
+						  :transition-label (transition-label transition)
+						  :next-label to-label)))))
+	reduced-dfa
+	))))
