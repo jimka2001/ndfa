@@ -31,7 +31,9 @@ TRANSITION-ABREVS (a car/cadr alist) mapping type specifiers to symbolic labels.
    If such a type specifier is found in the ndfa, and TRANSITION-LEGEND is true,
    then the name indicated in TRANSITION-ABREVS is used, otherwise a new symbolic name
    is generated.   This feature allows you to create multiple NDFA graphs using the
-   same state transition lablels."
+   same state transition lablels.
+   If STATE-LEGEND is nil, then state labels in the graphical output will correspond to
+   the (state-legend ...) of the state."
   (declare (ignore view)
 	   (type (or (member t nil) stream)))
   (flet ((stringify (data)
@@ -61,6 +63,10 @@ TRANSITION-ABREVS (a car/cadr alist) mapping type specifiers to symbolic labels.
 	  (incf state-num)))
       (dolist (state (reverse (states ndfa)))
 	(format stream "  /* ~D */~%" (gethash (state-label state) state-map))
+	(unless state-legend
+	  ;; if state-legend is nil, that means we tell graphvis to diplay the
+	  ;;   name the states according to the state-label of the state.
+	  (format stream "  ~D [label=\"~A\"]~%" (gethash (state-label state) state-map) (state-label state)))
 	(when (state-initial-p state)
 	  (format stream "    H~D [label=\"\", style=invis, width=0]~%" hidden)
 	  (format stream "    H~D -> ~D;~%" hidden (gethash (state-label state) state-map))
