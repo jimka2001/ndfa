@@ -301,6 +301,21 @@ the ADD-STATE function."
       (apply #'add-state ndfa state-designator))
     ndfa))
 
+(defun remove-invalid-transitions (dfa &optional (valid-states (states dfa)))
+  "Modify all the transition lists for all the states in the DFA, so that any
+transition is removed if it leads directly to a state which is not in the list
+of valid states. An ERROR is signaled if such removing makes a state
+non-coaccessible."
+  (dolist (state (states dfa) dfa)
+    (setf (transitions state)
+	  (setof transition (transitions state)
+	    (member (next-state transition) valid-states :test #'eq)))
+    (unless (or (transitions state)
+		(state-final-p state))
+      ;; finals states are the only ones which are allowed to have no transitions
+      (error "after removing invalid transitions, a state ~A has become non-coaccessible; this appears to be an internal error"
+	     state))))
+
 (defun remove-invalid-states (dfa valid-states)
   "Remove all states from (states dfa), (get-final-states dfa), and (get-initial-states dfa)
 which are not in VALID-STATES."
@@ -316,6 +331,11 @@ which are not in VALID-STATES."
 	(get-initial-states dfa)
 	(intersection (get-initial-states dfa)
 		      valid-states))
+
+  ;; now remove any transitions on remaining states which point
+  ;; to one of the states we just finished removing
+  (remove-invalid-transitions dfa valid-states)
+
   dfa)
 
 (defun remove-non-coaccessible-states (dfa)
@@ -326,7 +346,8 @@ which are not in VALID-STATES."
     (dolist (f (get-final-states dfa))
       (tconc buf f))
 
-    ;; build an alist which maps a state to all the states which have a transition to it.
+    ;; build (back-pointerss) an alist which maps a state to all the
+    ;;          states which have a transition to it.
     ;;   car --> target state
     ;;   cdr --> list of states with a transition to target 
     (dolist (state (states dfa))
@@ -336,6 +357,8 @@ which are not in VALID-STATES."
 	      (pushnew state (cdr (assoc target reverse-assoc)))
 	      (push (list target state) reverse-assoc)))))
 
+    ;; now, using the back-pointers, trace back from final states
+    ;;   to all states which have a path thereto.
     (dolist-tconc (target buf)
       (dolist (before (cdr (assoc target reverse-assoc)))
 	(unless (member before (car buf))
@@ -373,8 +396,12 @@ which are not in VALID-STATES."
   "Trim a state machine.  This means if any state has no path to a final state, then remove
 it; and if any state is not reachable from an inital state, then remove it.
 RETURNS the given DFA perhaps after having some if its states removed."
-  (remove-non-accessible-states dfa)
-  (remove-non-coaccessible-states dfa))
+  ;; we have to remove non-coaccessible states before remove-non-accessible-states,
+  ;;    because the function REMOVE-INVALID-STATES checks that removing states does not
+  ;;    create non-coaccessible.  If we called the functions in the opposite order
+  ;;    there might be non-coaccessible states after removing the non-accessible states.
+  (remove-non-coaccessible-states dfa)
+  (remove-non-accessible-states dfa))
 
 (defun reduce-state-machine (dfa &key (combine (transition-label-combine dfa)) (equal-labels (transition-label-equal dfa)))
   "COMBINE is either nil or a binary function which takes two transition labels and returns a new label representing
