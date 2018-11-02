@@ -1,4 +1,4 @@
-;; Copyright (c) 2016 EPITA Research and Development Laboratory
+;; Copyright (c) 2016,2018 EPITA Research and Development Laboratory
 ;;
 ;; Permission is hereby granted, free of charge, to any person obtaining
 ;; a copy of this software and associated documentation
@@ -32,6 +32,7 @@
 	   "NEXT-STATE"
 	   "PERFORM-SOME-TRANSITIONS"
 	   "PERFORM-TRANSITIONS"
+	   "REDUCE-STATE-MACHINE"
 	   "STATE-FINAL-P"
 	   "STATE-LABEL"
 	   "STATE-MACHINE"
@@ -65,7 +66,18 @@ accepted or rejected.
                 the :TEST function.
    transition-label - the value returned from (TRANSITION-LABEL transition)
                 is passed as the 2nd argument of the :TEST function")
-   (key  :initform #'identity :initarg :key :reader key :type (function (t) t)))
+   (key  :initform #'identity :initarg :key :reader key :type (function (t) t))
+   (transition-label-combine :initform nil :initarg :transition-label-combine
+			     :reader transition-label-combine
+			     :type (or null (function (t t) t))
+			     :documentation "When reducing a state machine, this function
+ takes two transition labels and returns a new label representing
+ the combination of the two given. nil => don't combine parallel transitions.")
+   (transition-label-equal :initform #'eql :initarg :transition-label-equal
+			   :type (function (t t) t)
+			   :reader transition-label-equal
+			   :documentation "When reducing a state-machine, this function indicates 
+how to determine whether two transition labels are considered equal."))
   (:documentation "A finite state machine.  An application program is expected to maintain
 a list of states, each an element of (STATES ...), and use either the function
 PERFORM-TRANSITIONS or PERFORM-SOME-TRANSITIONS to compute the list of next states
@@ -82,7 +94,7 @@ Code which manipulate state transitions, use this label to identify intended sta
 have yet been created as part of the initialization process.  The label is also used within PRINT-OBJECT.
 It is not allowed to have two different states in the same state-machine which have the same label
 according to the EQUAL function.")
-   (state-number :initform (incf *state-number*))
+   (state-number :initform (incf *state-number*) :reader state-number)
    (ndfa :initarg :ndfa :reader ndfa :type state-machine
 	 :documentation "The instance of STATE-MACHINE for which this instance of STATE is state of.  I.e.,
 this STATE instance is a member of (STATES (STATE-MACHINE state))")
@@ -232,13 +244,24 @@ None, some, or all of these states might be final states of the state machine."
   (declare (type sequence input-sequence))
   (perform-some-transitions ndfa (get-initial-states ndfa) input-sequence))
 
-(defgeneric add-transition (state &key next-label transition-label))
+(defgeneric add-transition (state &key next-label transition-label equal-label))
 
-(defmethod add-transition ((state state) &key next-label transition-label)
+(defmethod add-transition ((state state) &key next-label transition-label (equal-label #'eql))
   "Create and return an instance of TRANSITION from STATE to the state designated by NEXT-LABEL.
 Note, that the state indicated by NEXT-LABEL might not yet exist."
-  (car (push (make-instance 'transition :state state :next-label next-label :transition-label transition-label)
-	     (transitions state))))
+  (cond
+    ;; if such a transition already exists, then just return it without creating a new one
+    ((find-if (lambda (transition)
+		(and (eql (next-label transition) next-label)
+		     (funcall equal-label transition-label (transition-label transition))))
+	      (transitions state)))
+    ;; if a transition already exists the label then error
+    ((exists transition (transitions state)
+       (funcall equal-label transition-label (transition-label transition)))
+     (error "a transition already exists with label ~A~%" transition-label))
+    (t
+     (car (push (make-instance 'transition :state state :next-label next-label :transition-label transition-label)
+		(transitions state))))))
 
 (defgeneric add-state (object &key label initial-p final-p transitions))
 
@@ -278,6 +301,21 @@ the ADD-STATE function."
       (apply #'add-state ndfa state-designator))
     ndfa))
 
+(defun remove-invalid-transitions (dfa &optional (valid-states (states dfa)))
+  "Modify all the transition lists for all the states in the DFA, so that any
+transition is removed if it leads directly to a state which is not in the list
+of valid states. An ERROR is signaled if such removing makes a state
+non-coaccessible."
+  (dolist (state (states dfa) dfa)
+    (setf (transitions state)
+	  (setof transition (transitions state)
+	    (member (next-state transition) valid-states :test #'eq)))
+    (unless (or (transitions state)
+		(state-final-p state))
+      ;; finals states are the only ones which are allowed to have no transitions
+      (error "after removing invalid transitions, a state ~A has become non-coaccessible; this appears to be an internal error"
+	     state))))
+
 (defun remove-invalid-states (dfa valid-states)
   "Remove all states from (states dfa), (get-final-states dfa), and (get-initial-states dfa)
 which are not in VALID-STATES."
@@ -293,6 +331,11 @@ which are not in VALID-STATES."
 	(get-initial-states dfa)
 	(intersection (get-initial-states dfa)
 		      valid-states))
+
+  ;; now remove any transitions on remaining states which point
+  ;; to one of the states we just finished removing
+  (remove-invalid-transitions dfa valid-states)
+
   dfa)
 
 (defun remove-non-coaccessible-states (dfa)
@@ -303,7 +346,8 @@ which are not in VALID-STATES."
     (dolist (f (get-final-states dfa))
       (tconc buf f))
 
-    ;; build an alist which maps a state to all the states which have a transition to it.
+    ;; build (back-pointerss) an alist which maps a state to all the
+    ;;          states which have a transition to it.
     ;;   car --> target state
     ;;   cdr --> list of states with a transition to target 
     (dolist (state (states dfa))
@@ -313,6 +357,8 @@ which are not in VALID-STATES."
 	      (pushnew state (cdr (assoc target reverse-assoc)))
 	      (push (list target state) reverse-assoc)))))
 
+    ;; now, using the back-pointers, trace back from final states
+    ;;   to all states which have a path thereto.
     (dolist-tconc (target buf)
       (dolist (before (cdr (assoc target reverse-assoc)))
 	(unless (member before (car buf))
@@ -350,5 +396,111 @@ which are not in VALID-STATES."
   "Trim a state machine.  This means if any state has no path to a final state, then remove
 it; and if any state is not reachable from an inital state, then remove it.
 RETURNS the given DFA perhaps after having some if its states removed."
-  (remove-non-accessible-states dfa)
-  (remove-non-coaccessible-states dfa))
+  ;; we have to remove non-coaccessible states before remove-non-accessible-states,
+  ;;    because the function REMOVE-INVALID-STATES checks that removing states does not
+  ;;    create non-coaccessible.  If we called the functions in the opposite order
+  ;;    there might be non-coaccessible states after removing the non-accessible states.
+  (remove-non-coaccessible-states dfa)
+  (remove-non-accessible-states dfa))
+
+(defun reduce-state-machine (dfa &key (combine (transition-label-combine dfa)) (equal-labels (transition-label-equal dfa)))
+  "COMBINE is either nil or a binary function which takes two transition labels and returns a new label representing
+ the combination of the two given."
+  (declare (type state-machine dfa)
+	   (type (or null (function (t t) t)) combine))
+  (trim-state-machine dfa)
+  (let ((partitions (list (set-difference (states dfa) (get-final-states dfa))
+			  (get-final-states dfa))))
+
+    (labels ((find-partition (state)
+	       (declare (type state state))
+	       (the cons
+		    (car (exists partition partitions
+			   (member state partition :test #'eq)))))
+	     (partition-transition (state)
+	       (declare (type state state))
+	       (mapcar (lambda (transition)
+			 (declare (type transition transition))
+			 (list  :with (transition-label transition) :to (find-partition (next-state transition))))
+		       (transitions state)))
+	     (plist-equal (plist1 plist2)
+	       (declare (type (cons keyword cons) plist1 plist2))
+	       (and (eq (getf plist1 :to)
+			(getf plist2 :to))
+		    (funcall equal-labels
+			     (getf plist1 :with)
+			     (getf plist2 :with))))
+	     (refine-partition (partition)
+	       ;; partition is a list of states
+	       (let ((characterization (group-by partition
+						 :key #'partition-transition
+						 :test (lambda (plists1 plists2)
+							 (not (set-exclusive-or plists1 plists2
+										:test #'plist-equal))))))
+		 ;; characterization is a car/cadr alist mapping a plist to a list of states which is a subset of partition
+		 ;; plist looks like ( :with ...  :to ...)
+		 (loop :for grouped-by-transitions :in characterization
+		       :collect (destructuring-bind (_plist equiv-states) grouped-by-transitions
+				  (declare (ignore _plist))
+				  ;; this call to SETOF creates a list with the same elements as equiv-states,
+				  ;;   but so that they are order in the same order as they are found
+				  ;;   in (STATES DFA).  This is so that FIXED-POINT can depend on the order
+				  ;;   and recognize when the same value has been returned twice from REFINE-PARTITIONS.
+				  (setof state (states dfa)
+				    (member state equiv-states :test #'eq))))))
+	     (refine-partitions (p)
+	       (setf partitions (mapcan #'refine-partition p))))
+	
+      (fixed-point #'refine-partitions
+		   partitions)
+
+      ;; now build new state machine, and combine parallel transitions using the COMBINE function
+      (let* ((reduced-dfa (make-instance (class-of dfa)))
+	     (new-state->equiv-class 
+	       ;; add new states to reduced-dfa
+	       (loop :for equiv-class :in partitions
+		     :collect (cons (add-state reduced-dfa
+					       :label (state-label (car equiv-class))
+					       :initial-p (if (exists state equiv-class
+								(state-initial-p state))
+							      t nil)
+					       :final-p   (if (exists state equiv-class
+								(state-final-p state))
+							      t nil))
+				    equiv-class))))
+	
+	;; add transitions to each state
+	(loop :for (from-state . from-equiv-class) :in new-state->equiv-class
+	      ;; collect all the transistions from this from-equiv-class
+	      ;; and group them by equiv-class of next state
+	      :for transitions = (mapcan (lambda (old-state)
+					   (copy-list (transitions old-state))) from-equiv-class)
+	      :for grouped-by-destination = (group-by transitions
+						      :key (lambda (transition)
+							     (find-partition (next-state transition)))
+						      :test #'eq)
+	      :do (loop :for pair :in grouped-by-destination
+			:for to-equiv-class = (car pair)
+			:for to-label = (state-label (car to-equiv-class))
+			:for transitions = (remove-duplicates (cadr pair)
+							      :key #'transition-label
+							      :test equal-labels)
+			:do (if combine
+				;; duplicate transition labels have already been removed, but
+				;;   we still need to compile labels which are different.
+				;;   e.g., number + string = (or number string)
+				;;   e.g., fixnum + (and number (not fixnum)) = number
+				(add-transition from-state
+						:equal-label equal-labels
+						:transition-label (reduce combine (mapcar #'transition-label transitions)
+									  :initial-value (transition-label (car transitions)))
+						:next-label to-label)
+				;; otherwise, make several transitions between the same two states,
+				;; each with a different transition label
+				(dolist (transition transitions)
+				  (add-transition from-state
+						  :equal-label equal-labels
+						  :transition-label (transition-label transition)
+						  :next-label to-label)))))
+	reduced-dfa
+	))))
