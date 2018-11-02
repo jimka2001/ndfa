@@ -94,7 +94,7 @@ Code which manipulate state transitions, use this label to identify intended sta
 have yet been created as part of the initialization process.  The label is also used within PRINT-OBJECT.
 It is not allowed to have two different states in the same state-machine which have the same label
 according to the EQUAL function.")
-   (state-number :initform (incf *state-number*))
+   (state-number :initform (incf *state-number*) :reader state-number)
    (ndfa :initarg :ndfa :reader ndfa :type state-machine
 	 :documentation "The instance of STATE-MACHINE for which this instance of STATE is state of.  I.e.,
 this STATE instance is a member of (STATES (STATE-MACHINE state))")
