@@ -66,7 +66,18 @@ accepted or rejected.
                 the :TEST function.
    transition-label - the value returned from (TRANSITION-LABEL transition)
                 is passed as the 2nd argument of the :TEST function")
-   (key  :initform #'identity :initarg :key :reader key :type (function (t) t)))
+   (key  :initform #'identity :initarg :key :reader key :type (function (t) t))
+   (transition-label-combine :initform nil :initarg :transition-label-combine
+			     :reader transition-label-combine
+			     :type (or null (function (t t) t))
+			     :documentation "When reducing a state machine, this function
+ takes two transition labels and returns a new label representing
+ the combination of the two given. nil => don't combine parallel transitions.")
+   (transition-label-equal :initform #'eql :initarg :transition-label-equal
+			   :type (function (t t) t)
+			   :reader transition-label-equal
+			   :documentation "When reducing a state-machine, this function indicates 
+how to determine whether two transition labels are considered equal."))
   (:documentation "A finite state machine.  An application program is expected to maintain
 a list of states, each an element of (STATES ...), and use either the function
 PERFORM-TRANSITIONS or PERFORM-SOME-TRANSITIONS to compute the list of next states
@@ -365,7 +376,7 @@ RETURNS the given DFA perhaps after having some if its states removed."
   (remove-non-accessible-states dfa)
   (remove-non-coaccessible-states dfa))
 
-(defun reduce-state-machine (dfa &key (combine nil) (equal-labels #'eql))
+(defun reduce-state-machine (dfa &key (combine (transition-label-combine dfa)) (equal-labels (transition-label-equal dfa)))
   "COMBINE is either nil or a binary function which takes two transition labels and returns a new label representing
  the combination of the two given."
   (declare (type state-machine dfa)
