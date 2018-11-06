@@ -116,6 +116,12 @@ this STATE instance is a member of (STATES (STATE-MACHINE state))")
   (:documentation "Instances of this class comprise the values of the STATES slot of
 an instance of class STATE-MACHINE."))
 
+(defmethod slot-unbound ((class standard-class) (state state) (slot-name (eql 'exit-form)))
+  (setf (slot-value state slot-name)
+	(if (state-final-p state)
+	    t
+	    nil)))
+
 (defgeneric state-name (state))
 
 (defmethod state-name ((state state))
@@ -535,8 +541,8 @@ RETURNS the given DFA perhaps after having some if its states removed."
 	(state->states (make-hash-table :test #'eq))
 	(buf (list nil)))
     (labels ((calc-final (st1 st2)
-	       (declare (type state st1 st2))
-	       (funcall boolean-function (state-final-p st1) (state-final-p st2)))
+	       (declare (type (or null state) st1 st2))
+	       (funcall boolean-function (and st1 (state-final-p st1)) (and st2 (state-final-p st2))))
 	     (product-state (st1 st2)
 	       (declare (type state st1 st2))
 	       (or (gethash (list st1 st2) states->state nil)
