@@ -301,8 +301,11 @@ Note, that the state indicated by NEXT-LABEL might not yet exist."
 				       :initial-p initial-p
 				       :final-p final-p)))
 	 (when final-p
+	   (slot-makunbound ndfa 'final-states)
 	   (setf (state-exit-form new-state) exit-form))
-
+	 (when initial-p
+	   (slot-makunbound ndfa 'initial-states))
+	 (slot-makunbound ndfa 'sticky-states)
 	 (dolist (transition transitions)
 	   (apply #'add-transition new-state transition))
 	 (push new-state (states ndfa))
@@ -543,11 +546,11 @@ RETURNS the given DFA perhaps after having some if its states removed."
     (labels ((calc-final (st1 st2)
 	       (declare (type (or null state) st1 st2))
 	       (funcall boolean-function (and st1 (state-final-p st1)) (and st2 (state-final-p st2))))
-	     (product-state (st1 st2)
-	       (declare (type state st1 st2))
+	     (product-state (st1 st2 &key initial-p)
+	       (declare (type (or null state) st1 st2))
 	       (or (gethash (list st1 st2) states->state nil)
 		   (let ((new-state (add-state sm-product
-					       :initial-p t
+					       :initial-p initial-p
 					       :final-p (calc-final st1 st2)
 					       :label (incf label))))
 		     (setf (gethash (list st1 st2) states->state) new-state
@@ -558,31 +561,32 @@ RETURNS the given DFA perhaps after having some if its states removed."
 	       (find-if (lambda (transition)
 			  (funcall match-label label (transition-label transition)))
 			(transitions st-from)))
-	     (match-next-state (st-from label &aux (matching-transition (match-transition st-from label)))
+	     (match-next-state (st-from label &aux (matching-transition (and st-from (match-transition st-from label))))
 	       ;; matching-transition is either a transition object or nil
-	       (if matching-transition
-		   (next-state matching-transition)
-		   nil))
+	       (cond
+		 ((null st-from) nil)
+		 (matching-transition
+		  (next-state matching-transition))
+		 (t
+		   nil)))
 	       
 	     (make-initial-states ()
 	       (dolist (st1 (get-initial-states sm1))
 		 (dolist (st2 (get-initial-states sm2))
-		   (product-state st1 st2)))))
+		   (product-state st1 st2 :initial-p t)))))
       
       (make-initial-states)
-
       (dolist-tconc (product-state buf (reduce-state-machine sm-product))
 	(destructuring-bind (st1-from st2-from) (gethash product-state state->states)
-	  (dolist (label (funcall union-labels
-				  (mapcar #'transition-label (transitions st1-from))
-				  (mapcar #'transition-label (transitions st2-from))))
-	    (let* ((next-state-1 (match-next-state st1-from label))
-		   (next-state-2 (match-next-state st2-from label))
-		   (next-product-state (add-state sm-product
-						  :final-p (calc-final next-state-1 next-state-2))))
+	  (dolist (transition-label (funcall union-labels
+					     (and st1-from (mapcar #'transition-label (transitions st1-from)))
+					     (and st2-from (mapcar #'transition-label (transitions st2-from)))))
+	    (let* ((next-state-1 (match-next-state st1-from transition-label))
+		   (next-state-2 (match-next-state st2-from transition-label))
+		   (next-product-state (product-state next-state-1 next-state-2)))
 	      (when (state-final-p next-product-state)
 		(funcall final-state-callback next-product-state next-state-1 next-state-2))
-	      (add-transition product-state :next-label (state-label next-product-state) :transition-label label))))))))
+	      (add-transition product-state :next-label (state-label next-product-state) :transition-label transition-label))))))))
 
 (defgeneric synchronized-product (sm1 sm2 &key boolean-function))
 
