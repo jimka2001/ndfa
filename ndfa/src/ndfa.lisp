@@ -428,9 +428,8 @@ RETURNS the given DFA perhaps after having some if its states removed."
   (declare (type state-machine dfa)
 	   (type (or null (function (t t) t)) combine))
   (trim-state-machine dfa)
-  (let ((partitions (list (set-difference (states dfa) (get-final-states dfa))
-			  (get-final-states dfa))))
-
+  (let ((partitions (cons (set-difference (states dfa) (get-final-states dfa))
+			  (mapcar #'cadr (group-by (get-final-states dfa) :key #'state-exit-form :test #'equal)))))
     (labels ((find-partition (state)
 	       (declare (type state state))
 	       (the cons
@@ -483,6 +482,7 @@ RETURNS the given DFA perhaps after having some if its states removed."
 					       :initial-p (if (exists state equiv-class
 								(state-initial-p state))
 							      t nil)
+					       :exit-form (state-exit-form (car equiv-class))
 					       :final-p   (if (exists state equiv-class
 								(state-final-p state))
 							      t nil))
