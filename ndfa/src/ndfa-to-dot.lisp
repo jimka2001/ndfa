@@ -97,10 +97,18 @@ TRANSITION-ABREVS (a car/cadr alist) mapping type specifiers to symbolic labels.
 				   (dolist (transition-label (cdr transition-labels))
 				     (format str ",~A" (get-label transition-label)))))))
 		   hash))
-	(when (state-final-p state)
-	  (format stream "    H~D [label=\"\", style=invis, width=0]~%" hidden)
-	  (format stream "    ~D -> H~D ;~%" (gethash (state-label state) state-map) hidden)
-	  (incf hidden)))
+	(cond
+	  ((null (state-final-p state))
+	   nil)
+	  ((state-exit-form state)
+	   (format stream "    X~D [label=\"~A\", shape=rarrow]~%"
+		   hidden (state-exit-form state))
+	   (format stream "    ~D -> X~D ;~%" (gethash (state-label state) state-map) hidden)
+	   (incf hidden))
+	  (t
+	   (format stream "    H~D [label=\"\", style=invis, width=0]~%" hidden)
+	   (format stream "    ~D -> H~D ;~%" (gethash (state-label state) state-map) hidden)
+	   (incf hidden))))
       (format stream "  labelloc = \"b\";~%")
 
       (case state-legend
