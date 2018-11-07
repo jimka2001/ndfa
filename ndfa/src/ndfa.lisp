@@ -32,13 +32,18 @@
 	   "NEXT-STATE"
 	   "PERFORM-SOME-TRANSITIONS"
 	   "PERFORM-TRANSITIONS"
+	   "POPULATE-SYNCHRONIZED-PRODUCT"
 	   "REDUCE-STATE-MACHINE"
+	   "STATE-EXIT-FORM"
 	   "STATE-FINAL-P"
 	   "STATE-LABEL"
 	   "STATE-MACHINE"
 	   "STATE-NAME"
 	   "STATE-STICKY-P"
 	   "STATES"
+	   "SYNCHRONIZED-PRODUCT"
+	   "TRANSITION-LABEL-COMBINE"
+	   "TRANSITION-LABEL-EQUAL"
 	   "TRANSITION-LABEL"
 	   "TRANSITIONS"
 	   "TRIM-STATE-MACHINE"
@@ -104,10 +109,18 @@ this STATE instance is a member of (STATES (STATE-MACHINE state))")
 	      :documentation "Indicates whether the state is an initial state of the state machine.")
    (sticky-p :initarg :sticky-p :initform nil :accessor state-sticky-p
 	     :documentation "A state is sticky if once the NDFA gets into this state, it cannot leave.")
+   ;; TODO, not sure this is the best place to put the continuation information
+   (exit-form :initarg :exit-form :accessor state-exit-form)
    (final-p :initarg :final-p :initform nil :reader state-final-p
 	    :documentation "Indicates whether the state is a final state of the state machine."))
   (:documentation "Instances of this class comprise the values of the STATES slot of
 an instance of class STATE-MACHINE."))
+
+(defmethod slot-unbound ((class standard-class) (state state) (slot-name (eql 'exit-form)))
+  (setf (slot-value state slot-name)
+	(if (state-final-p state)
+	    t
+	    nil)))
 
 (defgeneric state-name (state))
 
@@ -263,14 +276,14 @@ Note, that the state indicated by NEXT-LABEL might not yet exist."
      (car (push (make-instance 'transition :state state :next-label next-label :transition-label transition-label)
 		(transitions state))))))
 
-(defgeneric add-state (object &key label initial-p final-p transitions))
+(defgeneric add-state (object &key label initial-p final-p transitions exit-form))
 
-(defmethod add-state ((ndfa state-machine) &key label initial-p final-p transitions)
+(defmethod add-state ((ndfa state-machine) &key label initial-p final-p transitions exit-form)
   "Add or update a state designated by the given LABEL.  If the state already exists
-in the state-machine NDFA, (whose STATE-LABEL is EQUAL to LABEL) its INITIAL-P and 
-FINAL-P are updated to TRUE if :INITIAL-P or :FINAL-P are given as such
-(but not updated to NIL).  If the state does not yet exists, it one is created
-and added to the state machine."
+ in the state-machine NDFA, (whose STATE-LABEL is EQUAL to LABEL) its INITIAL-P and 
+ FINAL-P are updated to TRUE if :INITIAL-P or :FINAL-P are given as such
+ (but not updated to NIL).  If the state does not yet exists, it one is created
+ and added to the state machine."
   ;; TRANSITIONS is a list of sublists, each sublist is of the form
   ;; (unary-test-function destination-label)
   (let ((existing-state (find label (states ndfa) :key #'state-label :test #'equal)))
@@ -287,6 +300,12 @@ and added to the state machine."
 				       :label label
 				       :initial-p initial-p
 				       :final-p final-p)))
+	 (when final-p
+	   (slot-makunbound ndfa 'final-states)
+	   (setf (state-exit-form new-state) exit-form))
+	 (when initial-p
+	   (slot-makunbound ndfa 'initial-states))
+	 (slot-makunbound ndfa 'sticky-states)
 	 (dolist (transition transitions)
 	   (apply #'add-transition new-state transition))
 	 (push new-state (states ndfa))
@@ -409,9 +428,8 @@ RETURNS the given DFA perhaps after having some if its states removed."
   (declare (type state-machine dfa)
 	   (type (or null (function (t t) t)) combine))
   (trim-state-machine dfa)
-  (let ((partitions (list (set-difference (states dfa) (get-final-states dfa))
-			  (get-final-states dfa))))
-
+  (let ((partitions (cons (set-difference (states dfa) (get-final-states dfa))
+			  (mapcar #'cadr (group-by (get-final-states dfa) :key #'state-exit-form :test #'equal)))))
     (labels ((find-partition (state)
 	       (declare (type state state))
 	       (the cons
@@ -464,6 +482,7 @@ RETURNS the given DFA perhaps after having some if its states removed."
 					       :initial-p (if (exists state equiv-class
 								(state-initial-p state))
 							      t nil)
+					       :exit-form (state-exit-form (car equiv-class))
 					       :final-p   (if (exists state equiv-class
 								(state-final-p state))
 							      t nil))
@@ -504,3 +523,76 @@ RETURNS the given DFA perhaps after having some if its states removed."
 						  :next-label to-label)))))
 	reduced-dfa
 	))))
+
+(defgeneric populate-synchronized-product (sm-product sm1 sm2 &key boolean-function union-labels match-label))
+
+(defmethod populate-synchronized-product ((sm-product state-machine)
+					  (sm1 state-machine)
+					  (sm2 state-machine)
+					  &key (boolean-function (lambda (a b) (and a b)))
+					    (union-labels #'union)
+					    (match-label #'eql)
+					    (final-state-callback (lambda (product-final-state final-state-1 final-state-2)
+								    (declare (ignore product-final-state final-state-1 final-state-2))
+								    nil)))
+									   
+  (declare (type (function (t t) t) boolean-function)
+	   (type (function (list list) list) union-labels)
+	   (type (function (t t) t) match-label))
+  (let ((label 0)
+	(states->state (make-hash-table :test #'equal))
+	(state->states (make-hash-table :test #'eq))
+	(buf (list nil)))
+    (labels ((calc-final (st1 st2)
+	       (declare (type (or null state) st1 st2))
+	       (funcall boolean-function (and st1 (state-final-p st1)) (and st2 (state-final-p st2))))
+	     (product-state (st1 st2 &key initial-p)
+	       (declare (type (or null state) st1 st2))
+	       (or (gethash (list st1 st2) states->state nil)
+		   (let ((new-state (add-state sm-product
+					       :initial-p initial-p
+					       :final-p (calc-final st1 st2)
+					       :label (incf label))))
+		     (setf (gethash (list st1 st2) states->state) new-state
+			   (gethash new-state state->states) (list st1 st2))
+		     (tconc buf new-state)
+		     new-state)))
+	     (match-transition (st-from label)
+	       (find-if (lambda (transition)
+			  (funcall match-label label (transition-label transition)))
+			(transitions st-from)))
+	     (match-next-state (st-from label &aux (matching-transition (and st-from (match-transition st-from label))))
+	       ;; matching-transition is either a transition object or nil
+	       (cond
+		 ((null st-from) nil)
+		 (matching-transition
+		  (next-state matching-transition))
+		 (t
+		   nil)))
+	       
+	     (make-initial-states ()
+	       (dolist (st1 (get-initial-states sm1))
+		 (dolist (st2 (get-initial-states sm2))
+		   (product-state st1 st2 :initial-p t)))))
+      
+      (make-initial-states)
+      (dolist-tconc (product-state buf (reduce-state-machine sm-product))
+	(destructuring-bind (st1-from st2-from) (gethash product-state state->states)
+	  (dolist (transition-label (funcall union-labels
+					     (and st1-from (mapcar #'transition-label (transitions st1-from)))
+					     (and st2-from (mapcar #'transition-label (transitions st2-from)))))
+	    (let* ((next-state-1 (match-next-state st1-from transition-label))
+		   (next-state-2 (match-next-state st2-from transition-label))
+		   (next-product-state (product-state next-state-1 next-state-2)))
+	      (when (state-final-p next-product-state)
+		(funcall final-state-callback next-product-state next-state-1 next-state-2))
+	      (add-transition product-state :next-label (state-label next-product-state) :transition-label transition-label))))))))
+
+(defgeneric synchronized-product (sm1 sm2 &key boolean-function))
+
+(defmethod synchronized-product ((sm1 state-machine) (sm2 state-machine) &key (boolean-function (lambda (a b) (and a b))))
+  (if (eq (class-of sm1)
+	  (class-of sm2))
+      (populate-synchronized-product (make-instance (class-of sm1)) sm1 sm2 :boolean-function boolean-function)
+      (error "Cannot create synchronized product of ~A and ~A" (class-of sm1) (class-of sm2))))
+      
