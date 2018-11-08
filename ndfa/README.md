@@ -64,7 +64,7 @@ and added to the state machine.
 
 * `trim-state-machine` --  Remove all states from the state machine which have no path to a final state or from an initial state.
 
-* `reduce-state-machine` -- Minimize a state machine
+* `minimize-state-machine` -- Minimize a state machine
 
 * `ndfa-to-dot` --  Render a state machine as `".dot"` or `".png"`.
 Calling `NDFA-TO-DOT` with a `PATH` whose type is `"dot"` creates the `".dot"` file, which is input for the

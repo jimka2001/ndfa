@@ -44,7 +44,7 @@
 			   :transitions ((:next-label x4 :transition-label t6)))
 			  (:label x5
 			   :transitions ((:next-label x4 :transition-label t6))))))
-	 (reduced-dfa (reduce-state-machine dfa)))
+	 (reduced-dfa (minimize-state-machine dfa)))
     (assert-true (= 7 (length (states dfa))))
     (assert-true (= 5 (length (states reduced-dfa))))
 
@@ -68,7 +68,7 @@
 			    :final-p t
 			    :transitions ((:next-label B :transition-label 0)
 					  (:next-label C :transition-label 1))))))
-	 (reduced-dfa (reduce-state-machine dfa)))
+	 (reduced-dfa (minimize-state-machine dfa)))
     (assert-true (= 4 (length (states reduced-dfa))))
     ))
   

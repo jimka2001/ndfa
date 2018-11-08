@@ -33,7 +33,7 @@
 	   "PERFORM-SOME-TRANSITIONS"
 	   "PERFORM-TRANSITIONS"
 	   "POPULATE-SYNCHRONIZED-PRODUCT"
-	   "REDUCE-STATE-MACHINE"
+	   "MINIMIZE-STATE-MACHINE"
 	   "STATE-EXIT-FORM"
 	   "STATE-FINAL-P"
 	   "STATE-LABEL"
@@ -422,7 +422,7 @@ RETURNS the given DFA perhaps after having some if its states removed."
   (remove-non-coaccessible-states dfa)
   (remove-non-accessible-states dfa))
 
-(defun reduce-state-machine (dfa &key (combine (transition-label-combine dfa)) (equal-labels (transition-label-equal dfa)))
+(defun minimize-state-machine (dfa &key (combine (transition-label-combine dfa)) (equal-labels (transition-label-equal dfa)))
   "COMBINE is either nil or a binary function which takes two transition labels and returns a new label representing
  the combination of the two given."
   (declare (type state-machine dfa)
@@ -612,7 +612,7 @@ RETURNS the given DFA perhaps after having some if its states removed."
 	(destructuring-bind (st1-from st2-from) (gethash final-state state->states)
 	  (funcall final-state-callback final-state st1-from st2-from)))
 
-      (reduce-state-machine sm-product))))
+      (minimize-state-machine sm-product))))
 
 (defgeneric synchronized-product (sm1 sm2 &key boolean-function))
 
