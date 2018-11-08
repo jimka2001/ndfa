@@ -596,7 +596,7 @@ RETURNS the given DFA perhaps after having some if its states removed."
 		   (product-state st1 st2 :initial-p t)))))
       
       (make-initial-states)
-      (dolist-tconc (product-state buf (reduce-state-machine sm-product))
+      (dolist-tconc (product-state buf)
 	(destructuring-bind (st1-from st2-from) (gethash product-state state->states)
 	  (dolist (transition-label (funcall union-labels
 					     (and st1-from (mapcar #'transition-label (transitions st1-from)))
@@ -606,7 +606,13 @@ RETURNS the given DFA perhaps after having some if its states removed."
 		   (next-product-state (product-state next-state-1 next-state-2)))
 	      (when (state-final-p next-product-state)
 		(funcall final-state-callback next-product-state next-state-1 next-state-2))
-	      (add-transition product-state :next-label (state-label next-product-state) :transition-label transition-label))))))))
+	      (add-transition product-state :next-label (state-label next-product-state) :transition-label transition-label)))))
+
+      (dolist (final-state (get-final-states sm-product))
+	(destructuring-bind (st1-from st2-from) (gethash final-state state->states)
+	  (funcall final-state-callback final-state st1-from st2-from)))
+
+      (reduce-state-machine sm-product))))
 
 (defgeneric synchronized-product (sm1 sm2 &key boolean-function))
 
