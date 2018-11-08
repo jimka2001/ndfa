@@ -71,7 +71,15 @@ Calling `NDFA-TO-DOT` with a `PATH` whose type is `"dot"` creates the `".dot"` f
 graphviz dot program.   If `PATH` has type `"png"`, a temporary `".dot"` file will be created, and
 will be converted to a `".png"` file.
 
+## API for extensibility
 
+* `populate-synchronized-product` -- Given two state machines for which we with to calculate the cross-product,
+and a product state machine which has be allocated (as if by make-instance), update the product state machine
+with the states comprising the synchronized product.
+
+
+* `synchronized-product` -- Given two state machines, find their synchronized product by a call to 
+`POPULATE-SYNCHRONIZED-PRODUCT`.
 
 ### State API
 

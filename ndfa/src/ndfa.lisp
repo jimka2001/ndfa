@@ -524,7 +524,27 @@ RETURNS the given DFA perhaps after having some if its states removed."
 	reduced-dfa
 	))))
 
-(defgeneric populate-synchronized-product (sm-product sm1 sm2 &key boolean-function union-labels match-label))
+(defgeneric populate-synchronized-product (sm-product sm1 sm2 &key boolean-function union-labels match-label)
+  (:documentation
+   "Given two state machines for which we with to calculate the cross-product,
+ and a product state machine which has be allocated (as if by make-instance), update the product state machine
+ with the states comprising the synchronized product.  There are several optional arguments:
+ :BOOLEAN-FUNCTION -- This function is used to determine whether a newly created state (in the synchronized 
+   product) needs to be a final state.  If the synchronized product is being calculated to compute the AND of
+   two state machines then the BOOLEAN-FUNCTION should be (lambda (a b) (and a b)).
+ :UNION-LABELS -- This function is used to calculate the list of transition labels for a newly
+   created state in the synchronized product, given the list of transition labels from the original two
+   states.  This defaults to #'union.  This option is important for the method of 
+   POPULATE-SYNCHRONIZED-PRODUCT specializing on RTE-STATE-MACHINE which uses a curried form of
+   #'MDTD-BDD.
+ :MATCH-LABEL -- Find a transition given a label.  This function will be called with two arguments in
+   a dependable order; 1st the label being sought, 2nd the label of one of the existing transitions.
+   The ability to search for a transition with a predicate other than equality is important for the 
+   method of POPULATE-SYNCHRONIZED-PRODUCT specializing on RTE-STATE-MACHINE which uses #'subtypep
+   for this predicate.
+ :FINAL-STATE-CALLBACK -- a callback function to be called each time a new state in the synchronized 
+   product has been added, and after the transitions have been added, but before the state machine
+   has been trimmed and reduced."))
 
 (defmethod populate-synchronized-product ((sm-product state-machine)
 					  (sm1 state-machine)
