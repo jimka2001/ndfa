@@ -335,27 +335,25 @@ non-coaccessible."
       (error "after removing invalid transitions, a state ~A has become non-coaccessible; this appears to be an internal error"
 	     state))))
 
-(defun remove-invalid-states (dfa valid-states)
-  "Remove all states from (states dfa), (get-final-states dfa), and (get-initial-states dfa)
-which are not in VALID-STATES."
-  (declare (type state-machine dfa)
+(defun remove-invalid-states (ndfa valid-states)
+  "Remove all states from (states ndfa), (get-final-states ndfa), 
+ (get-sticky-states ndfa) and (get-initial-states ndfa)
+ which are not in VALID-STATES."
+  (declare (type state-machine ndfa)
 	   (type list valid-states))
-  (setf (states dfa)
-	(intersection (states dfa) valid-states)
 
-	(get-final-states dfa)
-	(intersection (get-final-states dfa)
-		      valid-states)
+  (setf (states ndfa)
+	(intersection (states ndfa) valid-states))
 
-	(get-initial-states dfa)
-	(intersection (get-initial-states dfa)
-		      valid-states))
-
+  (slot-makunbound ndfa 'sticky-states)
+  (slot-makunbound ndfa 'final-states)
+  (slot-makunbound ndfa 'initial-states)
+  
   ;; now remove any transitions on remaining states which point
   ;; to one of the states we just finished removing
-  (remove-invalid-transitions dfa valid-states)
+  (remove-invalid-transitions ndfa valid-states)
 
-  dfa)
+  ndfa)
 
 (defun remove-non-coaccessible-states (dfa)
   "Remove all states from the state machine which have no path to a final state"
