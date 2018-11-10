@@ -33,7 +33,7 @@
 	   "PERFORM-SOME-TRANSITIONS"
 	   "PERFORM-TRANSITIONS"
 	   "POPULATE-SYNCHRONIZED-PRODUCT"
-	   "REDUCE-STATE-MACHINE"
+	   "MINIMIZE-STATE-MACHINE"
 	   "STATE-EXIT-FORM"
 	   "STATE-FINAL-P"
 	   "STATE-LABEL"
@@ -335,27 +335,25 @@ non-coaccessible."
       (error "after removing invalid transitions, a state ~A has become non-coaccessible; this appears to be an internal error"
 	     state))))
 
-(defun remove-invalid-states (dfa valid-states)
-  "Remove all states from (states dfa), (get-final-states dfa), and (get-initial-states dfa)
-which are not in VALID-STATES."
-  (declare (type state-machine dfa)
+(defun remove-invalid-states (ndfa valid-states)
+  "Remove all states from (states ndfa), (get-final-states ndfa), 
+ (get-sticky-states ndfa) and (get-initial-states ndfa)
+ which are not in VALID-STATES."
+  (declare (type state-machine ndfa)
 	   (type list valid-states))
-  (setf (states dfa)
-	(intersection (states dfa) valid-states)
 
-	(get-final-states dfa)
-	(intersection (get-final-states dfa)
-		      valid-states)
+  (setf (states ndfa)
+	(intersection (states ndfa) valid-states))
 
-	(get-initial-states dfa)
-	(intersection (get-initial-states dfa)
-		      valid-states))
-
+  (slot-makunbound ndfa 'sticky-states)
+  (slot-makunbound ndfa 'final-states)
+  (slot-makunbound ndfa 'initial-states)
+  
   ;; now remove any transitions on remaining states which point
   ;; to one of the states we just finished removing
-  (remove-invalid-transitions dfa valid-states)
+  (remove-invalid-transitions ndfa valid-states)
 
-  dfa)
+  ndfa)
 
 (defun remove-non-coaccessible-states (dfa)
   "Remove all states from the state machine which have no path to a final state"
@@ -422,14 +420,18 @@ RETURNS the given DFA perhaps after having some if its states removed."
   (remove-non-coaccessible-states dfa)
   (remove-non-accessible-states dfa))
 
-(defun reduce-state-machine (dfa &key (combine (transition-label-combine dfa)) (equal-labels (transition-label-equal dfa)))
-  "COMBINE is either nil or a binary function which takes two transition labels and returns a new label representing
- the combination of the two given."
+(defun minimize-state-machine (dfa &key (combine (transition-label-combine dfa)) (equal-labels (transition-label-equal dfa)))
+  ":COMBINE -- either nil or a binary function which takes two transition labels and returns a new label representing
+ the combination of the two given.
+ :EQUAL-LABELS -- equivalence function for transition labels."
   (declare (type state-machine dfa)
 	   (type (or null (function (t t) t)) combine))
   (trim-state-machine dfa)
   (let ((partitions (cons (set-difference (states dfa) (get-final-states dfa))
 			  (mapcar #'cadr (group-by (get-final-states dfa) :key #'state-exit-form :test #'equal)))))
+    ;; initialize PARTITIONS by 1. the set of states which are NOT
+    ;;    final, and 2...n sets of states which are final where each
+    ;;    subset has the same (EQUAL) value of state-exit-form.
     (labels ((find-partition (state)
 	       (declare (type state state))
 	       (the cons
@@ -439,7 +441,8 @@ RETURNS the given DFA perhaps after having some if its states removed."
 	       (declare (type state state))
 	       (mapcar (lambda (transition)
 			 (declare (type transition transition))
-			 (list  :with (transition-label transition) :to (find-partition (next-state transition))))
+			 (list  :with (transition-label transition)
+				:to (find-partition (next-state transition))))
 		       (transitions state)))
 	     (plist-equal (plist1 plist2)
 	       (declare (type (cons keyword cons) plist1 plist2))
@@ -449,14 +452,21 @@ RETURNS the given DFA perhaps after having some if its states removed."
 			     (getf plist1 :with)
 			     (getf plist2 :with))))
 	     (refine-partition (partition)
-	       ;; partition is a list of states
+	       ;; Partition is a set (list of states) into one or more
+	       ;; lists such that each resulting list has the property
+	       ;; that all its element have the same value of
+	       ;; PARTITION-TRANSITION.  Here 'same' mean contains the
+	       ;; same elements in some order. (NOT (SET-EXCLUSIVE-OR
+	       ;; ...))
+	       ;; 
 	       (let ((characterization (group-by partition
 						 :key #'partition-transition
 						 :test (lambda (plists1 plists2)
 							 (not (set-exclusive-or plists1 plists2
 										:test #'plist-equal))))))
-		 ;; characterization is a car/cadr alist mapping a plist to a list of states which is a subset of partition
-		 ;; plist looks like ( :with ...  :to ...)
+		 ;; characterization is a car/cadr alist mapping a
+		 ;; plist to a list of states which is a subset of
+		 ;; partition plist looks like ( :with ...  :to ...)
 		 (loop :for grouped-by-transitions :in characterization
 		       :collect (destructuring-bind (_plist equiv-states) grouped-by-transitions
 				  (declare (ignore _plist))
@@ -468,11 +478,24 @@ RETURNS the given DFA perhaps after having some if its states removed."
 				    (member state equiv-states :test #'eq))))))
 	     (refine-partitions (p)
 	       (setf partitions (mapcan #'refine-partition p))))
-	
+
+      ;; Generate the partition by calling REFINE-PARTITIONS until we
+      ;;   find a fixed-point each such iteration modifies the value
+      ;;   of PARTITIONS.  each such refinement breaks one or more of
+      ;;   the subsets into smaller subsets.  This partitioning
+      ;;   assures that given any valid transition label L, and given
+      ;;   a partitions P=(p.1, p.2, ... p.n) (where p.1 .. pn are
+      ;;   states), then when p.i and p.j are in P then L take p.i and
+      ;;   p.j to the same partition.  I.e., if L(p.i)=q.i and
+      ;;   L(p.j)=q.j, then q.i and q.j are in the same partition.  By
+      ;;   'valid' transition we mean that it is a transition leaving
+      ;;   some state in P.
+      
       (fixed-point #'refine-partitions
 		   partitions)
 
-      ;; now build new state machine, and combine parallel transitions using the COMBINE function
+      ;; Now build new state machine, and combine any parallel
+      ;; transitions using the COMBINE function.
       (let* ((reduced-dfa (make-instance (class-of dfa)))
 	     (new-state->equiv-class 
 	       ;; add new states to reduced-dfa
@@ -612,7 +635,7 @@ RETURNS the given DFA perhaps after having some if its states removed."
 	(destructuring-bind (st1-from st2-from) (gethash final-state state->states)
 	  (funcall final-state-callback final-state st1-from st2-from)))
 
-      (reduce-state-machine sm-product))))
+      (minimize-state-machine sm-product))))
 
 (defgeneric synchronized-product (sm1 sm2 &key boolean-function))
 
