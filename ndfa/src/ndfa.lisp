@@ -628,8 +628,6 @@ RETURNS the given DFA perhaps after having some if its states removed."
 	    (let* ((next-state-1 (match-next-state st1-from transition-label))
 		   (next-state-2 (match-next-state st2-from transition-label))
 		   (next-product-state (product-state next-state-1 next-state-2)))
-	      (when (state-final-p next-product-state)
-		(funcall final-state-callback next-product-state next-state-1 next-state-2))
 	      (add-transition product-state :next-label (state-label next-product-state) :transition-label transition-label)))))
 
       (dolist (final-state (get-final-states sm-product))
