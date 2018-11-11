@@ -578,7 +578,6 @@ RETURNS the given DFA perhaps after having some if its states removed."
 					    (final-state-callback (lambda (product-final-state final-state-1 final-state-2)
 								    (declare (ignore product-final-state final-state-1 final-state-2))
 								    nil)))
-									   
   (declare (type (function (t t) t) boolean-function)
 	   (type (function (list list) list) union-labels)
 	   (type (function ((or null state) (or null state) (or null state)) t) final-state-callback)

@@ -128,6 +128,7 @@ TRANSITION-ABREVS (a car/cadr alist) mapping type specifiers to symbolic labels.
 	((nil) nil)
 	(t
 	 (maphash #'(lambda (label num)
+		      ;; print state-legend to stdout
 		      (format t "~D = " num)
 		      (write label :pretty nil :escape t :stream t :case :downcase)
 		      (format t "~%"))
