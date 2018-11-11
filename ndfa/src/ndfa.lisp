@@ -581,7 +581,9 @@ RETURNS the given DFA perhaps after having some if its states removed."
 									   
   (declare (type (function (t t) t) boolean-function)
 	   (type (function (list list) list) union-labels)
-	   (type (function (t t) t) match-label))
+	   (type (function ((or null state) (or null state) (or null state)) t) final-state-callback)
+	   (type (function (t t) t) match-label)
+	   (optimize (speed 3) (debug 0) (compilation-speed 0)))
   (let ((label 0)
 	(states->state (make-hash-table :test #'equal))
 	(state->states (make-hash-table :test #'eq))
@@ -640,6 +642,8 @@ RETURNS the given DFA perhaps after having some if its states removed."
 (defgeneric synchronized-product (sm1 sm2 &key boolean-function))
 
 (defmethod synchronized-product ((sm1 state-machine) (sm2 state-machine) &key (boolean-function (lambda (a b) (and a b))))
+  (declare (optimize (speed 3) (debug 0) (compilation-speed 0))
+	   (type (function (t t) t) boolean-function))
   (if (eq (class-of sm1)
 	  (class-of sm2))
       (populate-synchronized-product (make-instance (class-of sm1)) sm1 sm2 :boolean-function boolean-function)
