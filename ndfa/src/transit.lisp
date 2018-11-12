@@ -1,4 +1,4 @@
-;; Copyright (c) 2016 EPITA Research and Development Laboratory
+;; Copyright (c) 2018 EPITA Research and Development Laboratory
 ;;
 ;; Permission is hereby granted, free of charge, to any person obtaining
 ;; a copy of this software and associated documentation
@@ -20,16 +20,19 @@
 ;; WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
-(asdf:defsystem :ndfa
-  :version (:read-file-form "../version.lisp")
-  :author "Jim Newton"
-  :description "Implementation of non-deterministed finite automata"
-  :license "MIT"
-  :depends-on (:adjuvant)
-  :components
-  ((:module "src"
-    :components
-    ((:file "ndfa")
-     (:file "ndfa-to-dot" :depends-on ("ndfa"))
-     (:file "minimize" :depends-on ("ndfa"))
-     (:file "transit" :depends-on ("ndfa"))))))
+(in-package :ndfa)
+
+(defun find-transit (sm)
+  (declare (type state-machine sm))
+  (labels ((extract (transition-history)
+             (return-from find-transit (nreverse (mapcar #'transition-label transition-history))))
+           (transit (state transition-history)
+               (cond
+                 ((state-final-p state)
+                  (extract transition-history))
+                 (t
+                  (dolist (transition (transitions state))
+                    (unless (member transition transition-history :test #'eq)
+                      (transit (next-state transition) (cons transition transition-history))))))))
+    (dolist (state (get-initial-states sm))
+      (transit state nil))))
