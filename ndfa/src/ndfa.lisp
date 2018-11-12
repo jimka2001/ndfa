@@ -646,3 +646,18 @@ RETURNS the given DFA perhaps after having some if its states removed."
       (populate-synchronized-product (make-instance (class-of sm1)) sm1 sm2 :boolean-function boolean-function)
       (error "Cannot create synchronized product of ~A and ~A" (class-of sm1) (class-of sm2))))
       
+
+(defun find-transit (sm)
+  (declare (type state-machine sm))
+  (labels ((extract (transition-history)
+             (return-from find-transit (nreverse (mapcar #'transition-label transition-history))))
+           (transit (state transition-history)
+               (cond
+                 ((state-final-p state)
+                  (extract transition-history))
+                 (t
+                  (dolist (transition (transitions state))
+                    (unless (member transition transition-history :test #'eq)
+                      (transit (next-state transition) (cons transition transition-history))))))))
+    (dolist (state (get-initial-states sm))
+      (transit state nil))))
