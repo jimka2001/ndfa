@@ -24,8 +24,13 @@
 
 (defun find-transit (sm)
   (declare (type state-machine sm))
+  "Given a STATE-MACHINE finds a path from an initial state to a final state, if such exists.
+ The return value indicates a list of types of the elements of a sequence which would take the
+ state machine through the states of that path.
+ Returns two values:  the second return value is T if a transit is found, NIL otherwise.
+   If a transit is found, then the first return value is the type signature of such a transit."
   (labels ((extract (transition-history)
-             (return-from find-transit (nreverse (mapcar #'transition-label transition-history))))
+             (return-from find-transit (values (nreverse (mapcar #'transition-label transition-history)) t)))
            (transit (state transition-history)
                (cond
                  ((state-final-p state)
@@ -35,4 +40,5 @@
                     (unless (member transition transition-history :test #'eq)
                       (transit (next-state transition) (cons transition transition-history))))))))
     (dolist (state (get-initial-states sm))
-      (transit state nil))))
+      (transit state nil))
+    (values nil nil)))
