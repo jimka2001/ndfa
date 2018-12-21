@@ -216,7 +216,7 @@ RETURNS the given DFA perhaps after having some if its states removed."
 
 (defgeneric populate-synchronized-product (sm-product sm1 sm2 &key boolean-function union-labels match-label)
   (:documentation
-   "Given two state machines for which we with to calculate the cross-product,
+   "Given two state machines for which we wish to calculate the cross-product,
  and a product state machine which has be allocated (as if by make-instance), update the product state machine
  with the states comprising the synchronized product.  There are several optional arguments:
  :BOOLEAN-FUNCTION -- This function is used to determine whether a newly created state (in the synchronized 
@@ -232,7 +232,7 @@ RETURNS the given DFA perhaps after having some if its states removed."
    The ability to search for a transition with a predicate other than equality is important for the 
    method of POPULATE-SYNCHRONIZED-PRODUCT specializing on RTE-STATE-MACHINE which uses #'subtypep
    for this predicate.
- :FINAL-STATE-CALLBACK -- a callback function to be called each time a new state in the synchronized 
+ :FINAL-STATE-CALLBACK -- a callback function to be called each time a new final state in the synchronized 
    product has been added, and after the transitions have been added, but before the state machine
    has been trimmed and reduced."))
 
