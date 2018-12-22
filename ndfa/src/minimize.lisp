@@ -143,6 +143,11 @@ RETURNS the given DFA perhaps after having some if its states removed."
 				  ;;   and recognize when the same value has been returned twice from REFINE-PARTITIONS.
 				  (setof state (states dfa)
 				    (member state equiv-states :test #'eq))))))
+	     (min-clause-index (v1 v2)
+	       (cond ((null v1) v2)
+		     ((null v2) v1)
+		     (t
+		      (min v1 v2))))
 	     (refine-partitions (p)
 	       (setf partitions (mapcan #'refine-partition p))))
 
@@ -172,6 +177,7 @@ RETURNS the given DFA perhaps after having some if its states removed."
 					       :initial-p (if (exists state equiv-class
 								(state-initial-p state))
 							      t nil)
+					       :clause-index (reduce #'min-clause-index equiv-class :key #'clause-index)
 					       :exit-form (state-exit-form (car equiv-class))
 					       :final-p   (if (exists state equiv-class
 								(state-final-p state))
@@ -257,10 +263,24 @@ RETURNS the given DFA perhaps after having some if its states removed."
     (labels ((calc-final (st1 st2)
 	       (declare (type (or null state) st1 st2))
 	       (funcall boolean-function (and st1 (state-final-p st1)) (and st2 (state-final-p st2))))
+	     (calc-clause-index (st1 st2)
+	       (declare (type (or null state) st1 st2))
+	       (cond
+		 ((null st1)
+		  (clause-index st2))
+		 ((null st2)
+		  (clause-index st1))
+		 ((null (clause-index st2))
+		  (clause-index st1))
+		 ((null (clause-index st1))
+		  (clause-index st2))
+		 (t
+		  (min (clause-index st1) (clause-index st2)))))
 	     (product-state (st1 st2 &key initial-p)
 	       (declare (type (or null state) st1 st2))
 	       (or (gethash (list st1 st2) states->state nil)
 		   (let ((new-state (add-state sm-product
+					       :clause-index (calc-clause-index st1 st2)
 					       :initial-p initial-p
 					       :final-p (calc-final st1 st2)
 					       :label (incf label))))

@@ -23,6 +23,7 @@
   (:use :cl :adjuvant)
   (:nicknames "NDFA")
   (:export "ADD-STATE"
+	   "CLAUSE-INDEX"
 	   "DETERMINISTICP"
 	   "FIND-TRANSIT"
 	   "GET-FINAL-STATES"
@@ -110,7 +111,7 @@ this STATE instance is a member of (STATES (STATE-MACHINE state))")
 	      :documentation "Indicates whether the state is an initial state of the state machine.")
    (sticky-p :initarg :sticky-p :initform nil :accessor state-sticky-p
 	     :documentation "A state is sticky if once the NDFA gets into this state, it cannot leave.")
-   ;; TODO, not sure this is the best place to put the continuation information
+   (clause-index :initarg :clause-index :accessor clause-index :initform 0 :type (or null unsigned-byte))
    (exit-form :initarg :exit-form :accessor state-exit-form)
    (final-p :initarg :final-p :initform nil :reader state-final-p
 	    :documentation "Indicates whether the state is a final state of the state machine."))
@@ -277,9 +278,9 @@ Note, that the state indicated by NEXT-LABEL might not yet exist."
      (car (push (make-instance 'transition :state state :next-label next-label :transition-label transition-label)
 		(transitions state))))))
 
-(defgeneric add-state (object &key label initial-p final-p transitions exit-form))
+(defgeneric add-state (object &key label initial-p final-p transitions exit-form clause-index))
 
-(defmethod add-state ((ndfa state-machine) &key label initial-p final-p transitions exit-form)
+(defmethod add-state ((ndfa state-machine) &key label initial-p final-p transitions exit-form clause-index)
   "Add or update a state designated by the given LABEL.  If the state already exists
  in the state-machine NDFA, (whose STATE-LABEL is EQUAL to LABEL) its INITIAL-P and 
  FINAL-P are updated to TRUE if :INITIAL-P or :FINAL-P are given as such
@@ -287,6 +288,7 @@ Note, that the state indicated by NEXT-LABEL might not yet exist."
  and added to the state machine."
   ;; TRANSITIONS is a list of sublists, each sublist is of the form
   ;; (unary-test-function destination-label)
+  (declare (type (or null unsigned-byte) clause-index))
   (let ((existing-state (find label (states ndfa) :key #'state-label :test #'equal)))
     (cond
       (existing-state
@@ -298,6 +300,7 @@ Note, that the state indicated by NEXT-LABEL might not yet exist."
       (t
        (let ((new-state (make-instance 'state
 				       :ndfa ndfa
+				       :clause-index clause-index
 				       :label label
 				       :initial-p initial-p
 				       :final-p final-p)))
