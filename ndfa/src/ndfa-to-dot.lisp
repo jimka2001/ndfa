@@ -21,9 +21,9 @@
 
 (in-package :ndfa)
 
-(defgeneric ndfa-to-dot (object stream &rest others &key state-legend transition-legend transition-abrevs view prefix title))
+(defgeneric ndfa-to-dot (object stream &rest others &key state-legend transition-legend transition-abrevs transition-label-cb view prefix title))
 
-(defmethod ndfa-to-dot ((ndfa state-machine) stream &key (state-legend :dot) (transition-legend nil) transition-abrevs (view nil) prefix title)
+(defmethod ndfa-to-dot ((ndfa state-machine) stream &key (state-legend :dot) (transition-legend nil) transition-abrevs (transition-label-cb (lambda (label name) (declare (ignore label name)))) (view nil) prefix title)
   "Generate a dot file (for use by graphviz).  The dot file illustrates the states
 and and transitions of the NDFA state machine.  The dot file is written to STREAM
 which may be any valid first argument of FORMAT, but is usually t or a stream object.
@@ -47,21 +47,25 @@ TRANSITION-ABREVS (a car/cadr alist) mapping type specifiers to symbolic labels.
 		 (t
 		  (with-output-to-string (str)
 		    (write data :case :downcase :stream str)))))
-	 (new-transition-name ()
+	 (new-transition-name (transition-label)
 	   (let ((transition-index 1)
 		 (proposed-name "T1"))
 	     (loop :while (rassoc proposed-name transition-abrevs :test #'equal :key #'car)
 		   :do (progn (incf transition-index)
 			      (setf proposed-name (format nil "T~d" transition-index))))
+             (funcall transition-label-cb transition-label proposed-name)
 	     proposed-name)))
     (format stream "digraph G {~%")
-    (when title
-      (format stream "  labelloc=~S~%" "t")
-      (format stream "  label=~S;~%" title))
-    (format stream "  rankdir=LR;~%")
-    (format stream "  graph [labeljust=l,nojustify=true];~%")
-    (let ((state-map (make-hash-table :test #'equal))
+    (let ((*print-case* :downcase)
+          (state-map (make-hash-table :test #'equal))
+          (graph-label (make-string-output-stream))
 	  (hidden 0))
+
+      (when title
+        (format graph-label "~a" title))
+      (format stream "  rankdir=LR;~%")
+      (format stream "  graph [labeljust=l,nojustify=true];~%")
+
       (let ((state-num 0))
 	(dolist (state (reverse (states ndfa)))
 	  (setf (gethash (state-label state) state-map) state-num)
@@ -90,7 +94,7 @@ TRANSITION-ABREVS (a car/cadr alist) mapping type specifiers to symbolic labels.
 				   (stringify transition-label))
 				  (t
 				   (unless (assoc transition-label transition-abrevs :test #'equal)
-				     (push (list transition-label (new-transition-name))
+				     (push (list transition-label (new-transition-name transition-label))
 					   transition-abrevs))
 				   (cadr (assoc transition-label transition-abrevs :test #'equal))))))
 
@@ -107,44 +111,55 @@ TRANSITION-ABREVS (a car/cadr alist) mapping type specifiers to symbolic labels.
 	   nil)
 	  ((state-exit-form state)
 	   (format stream "    X~D [label=\"~A\", shape=rarrow]~%"
-		   hidden (state-exit-form state))
+		   hidden (clause-index state)
+                   ;; (state-exit-form state)
+                   )
 	   (format stream "    ~D -> X~D ;~%" (gethash (state-label state) state-map) hidden)
 	   (incf hidden))
 	  (t
 	   (format stream "    H~D [label=\"\", style=invis, width=0]~%" hidden)
 	   (format stream "    ~D -> H~D ;~%" (gethash (state-label state) state-map) hidden)
 	   (incf hidden))))
-      (format stream "  labelloc = \"b\";~%")
 
       (case state-legend
 	((:dot)
-	 (format stream "  label = \"~A\\l" (or title ""))
+	 (format graph-label "\\l")
 	 (maphash #'(lambda (label num)
-		      (format stream "~D = " num)
-		      (write label :pretty nil :escape t :stream stream :case :downcase)
-		      (format stream "\\l"))
-		  state-map)
-	 (format stream "\""))
+		      (format graph-label "~D = " num)
+		      (write label :pretty nil :escape t :stream graph-label :case :downcase)
+		      (format graph-label "\\l"))
+		  state-map))
 	((nil) nil)
 	(t
+	 (format graph-label "\\l")
 	 (maphash #'(lambda (label num)
 		      ;; print state-legend to stdout
 		      (format t "state-num ~D = " num)
 		      (write label :pretty nil :escape t :stream t :case :downcase)
-		      (format t "~%"))
+		      (format t "\l"))
 		  state-map)))
       
       (when transition-legend
-	(format stream "  label = \"\\l")
+	(format graph-label  "\\l")
 	(dolist (pair (reverse transition-abrevs))
-	  (destructuring-bind (transition-label abbreviation) pair
-	    (write abbreviation :pretty nil :escape nil :stream stream)
-	    (write " = " :pretty nil :escape nil :stream stream)
-	    (write transition-label :pretty nil :escape t :stream stream :case :downcase)
-	    (format stream "\\l")
-	    ))
-	(format stream "\""))
+          (destructuring-bind (transition-label abbreviation) pair
+            (when (exists state (states ndfa)
+                    (exists transition (transitions state)
+                      (equal (transition-label transition) transition-label)))
+              (write abbreviation :pretty nil :escape nil :stream graph-label)
+              (write " = " :pretty nil :escape nil :stream graph-label)
+              (write transition-label :pretty nil :escape t :stream graph-label :case :downcase)
+              (format graph-label "\\l")
+              ))))
       
+      (when (or title
+                state-legend
+                transition-legend)
+        (format stream "  labelloc = \"b\";~%")
+        (format stream "  label = \"~a\"~%"
+                (replace-all (get-output-stream-string graph-label)
+                             (format nil "~%")
+                             "\\l")))                
       (format stream "}~%"))))
 
 (defmethod ndfa-to-dot :around (ndfa (path string) &rest args)
@@ -159,16 +174,16 @@ the .dot file will be printed to a temporary file in /tmp (see MAKE-TEMP-FILE)."
 	     args)
       (call-next-method)))
 
-(defmethod ndfa-to-dot ((ndfa state-machine) (path pathname) &key (state-legend :dot) (transition-legend nil) transition-abrevs (view nil) prefix title)
+(defmethod ndfa-to-dot ((ndfa state-machine) (path pathname) &key (state-legend :dot) (transition-legend nil) transition-abrevs transition-label-cb (view nil) prefix title)
   "Calling NDFA-TO-DOT with a PATH whose type is \"dot\" creates the dot file, which is valid input for the
 graphviz dot program.   If PATH has type \"png\", a temporary dot file will be created, and
 will be converted to a png file which will be displayed using open -n.  This works for MAC only."
   (cond ((string= "dot" (pathname-type path))
 	 (with-open-file (stream path :direction :output :if-exists :rename)
-	   (ndfa-to-dot ndfa stream :state-legend state-legend :transition-legend transition-legend :transition-abrevs transition-abrevs :view nil :prefix prefix :title title)))
+	   (ndfa-to-dot ndfa stream :state-legend state-legend :transition-legend transition-legend :transition-abrevs transition-abrevs :transition-label-cb transition-label-cb :view nil :prefix prefix :title title)))
 	((string= "png" (pathname-type path))
 	 (let ((dotpath (merge-pathnames (make-pathname :type "dot")  path)))
-	   (ndfa-to-dot ndfa dotpath :state-legend state-legend :transition-legend transition-legend :transition-abrevs transition-abrevs :view nil :prefix prefix :title title)
+	   (ndfa-to-dot ndfa dotpath :state-legend state-legend :transition-legend transition-legend :transition-abrevs transition-abrevs :transition-label-cb transition-label-cb :view nil :prefix prefix :title title)
 	   (run-program *dot-path* (list "-Tpng" (namestring dotpath) "-o" (namestring path)))
 	   #+:os-macosx (when view (run-program "open" (list "-n" (namestring path))))))
 	(t
