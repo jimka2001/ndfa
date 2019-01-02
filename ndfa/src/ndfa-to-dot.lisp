@@ -65,7 +65,8 @@ TRANSITION-ABREVS (a car/cadr alist) mapping type specifiers to symbolic labels.
         (format graph-label "~a" title))
       (format stream "  rankdir=LR;~%")
       (format stream "  graph [labeljust=l,nojustify=true];~%")
-
+      (format stream "  node [fontname=Arial, fontsize=25];~%")
+      (format stream "  edge [fontname=Helvetica, fontsize=20];~%")
       (let ((state-num 0))
 	(dolist (state (reverse (states ndfa)))
 	  (setf (gethash (state-label state) state-map) state-num)
