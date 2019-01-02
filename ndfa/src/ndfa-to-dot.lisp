@@ -98,7 +98,8 @@ TRANSITION-ABREVS (a car/cadr alist) mapping type specifiers to symbolic labels.
 	  (maphash #'(lambda (next-label transition-labels)
 		       (flet ((get-label (transition-label)
 				(cond
-				  ((not transition-legend)
+				  ((and (not transition-legend)
+                                        (not transition-abrevs))
 				   (stringify transition-label))
 				  (t
 				   (unless (assoc transition-label transition-abrevs :test #'equal)
@@ -118,9 +119,9 @@ TRANSITION-ABREVS (a car/cadr alist) mapping type specifiers to symbolic labels.
 	  ((null (state-final-p state))
 	   nil)
 	  ((state-exit-form state)
-	   (format stream "    X~D [label=\"~A\", shape=rarrow]~%"
-		   hidden (clause-index state)
-                   ;; (state-exit-form state)
+	   (format stream "    X~D [label=\"~A\", shape=rarrow]~%" ;; or plaintext ?
+		   hidden ;;(clause-index state)
+                   (state-exit-form state)
                    )
 	   (format stream "    ~D -> X~D ;~%" (gethash (state-label state) state-map) hidden)
 	   (incf hidden))
@@ -144,7 +145,7 @@ TRANSITION-ABREVS (a car/cadr alist) mapping type specifiers to symbolic labels.
 		      ;; print state-legend to stdout
 		      (format t "state-num ~D = " num)
 		      (write label :pretty nil :escape t :stream t :case :downcase)
-		      (format t "\l"))
+		      (format t "~%"))
 		  state-map)))
       
       (when transition-legend
@@ -182,12 +183,14 @@ the .dot file will be printed to a temporary file in /tmp (see MAKE-TEMP-FILE)."
 	     args)
       (call-next-method)))
 
-(defmethod ndfa-to-dot ((ndfa state-machine) (path pathname) &key (state-legend :dot) (transition-legend nil) transition-abrevs transition-label-cb (view nil) prefix title)
+(defmethod ndfa-to-dot ((ndfa state-machine) (path pathname) &key (state-legend :dot) (transition-legend nil) transition-abrevs (transition-label-cb #'transition-label-cb) (view nil) prefix title)
   "Calling NDFA-TO-DOT with a PATH whose type is \"dot\" creates the dot file, which is valid input for the
 graphviz dot program.   If PATH has type \"png\", a temporary dot file will be created, and
 will be converted to a png file which will be displayed using open -n.  This works for MAC only."
+  (declare (type (function (t t) t) transition-label-cb))
   (cond ((string= "dot" (pathname-type path))
 	 (with-open-file (stream path :direction :output :if-exists :rename)
+           (format t "writing to ~A~%" stream)
 	   (ndfa-to-dot ndfa stream :state-legend state-legend :transition-legend transition-legend :transition-abrevs transition-abrevs :transition-label-cb transition-label-cb :view nil :prefix prefix :title title)))
 	((string= "png" (pathname-type path))
 	 (let ((dotpath (merge-pathnames (make-pathname :type "dot")  path)))
