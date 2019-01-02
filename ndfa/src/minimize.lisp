@@ -220,11 +220,12 @@ RETURNS the given DFA perhaps after having some if its states removed."
 	reduced-dfa
 	))))
 
-(defgeneric populate-synchronized-product (sm-product sm1 sm2 &key boolean-function union-labels match-label)
+(defgeneric populate-synchronized-product (sm-product sm1 sm2 &key boolean-function union-labels match-label minimize)
   (:documentation
    "Given two state machines for which we wish to calculate the cross-product,
  and a product state machine which has be allocated (as if by make-instance), update the product state machine
  with the states comprising the synchronized product.  There are several optional arguments:
+ :MINIMIZE -- boolean, (default TRUE) whether to minimize the newly created automaton.
  :BOOLEAN-FUNCTION -- This function is used to determine whether a newly created state (in the synchronized 
    product) needs to be a final state.  If the synchronized product is being calculated to compute the AND of
    two state machines then the BOOLEAN-FUNCTION should be (lambda (a b) (and a b)).
@@ -246,15 +247,15 @@ RETURNS the given DFA perhaps after having some if its states removed."
 					  (sm1 state-machine)
 					  (sm2 state-machine)
 					  &key (boolean-function (lambda (a b) (and a b)))
+                                            (minimize t)
 					    (union-labels #'union)
 					    (match-label #'eql)
 					    (final-state-callback (lambda (product-final-state final-state-1 final-state-2)
 								    (declare (ignore product-final-state final-state-1 final-state-2))
 								    nil)))
-  (declare (type (function (t t) t) boolean-function)
+  (declare (type (function (t t) t) match-label boolean-function)
 	   (type (function (list list) list) union-labels)
 	   (type (function ((or null state) (or null state) (or null state)) t) final-state-callback)
-	   (type (function (t t) t) match-label)
 	   (optimize (speed 3) (debug 0) (compilation-speed 0)))
   (let ((label 0)
 	(states->state (make-hash-table :test #'equal))
@@ -321,14 +322,16 @@ RETURNS the given DFA perhaps after having some if its states removed."
 	(destructuring-bind (st1-from st2-from) (gethash final-state state->states)
 	  (funcall final-state-callback final-state st1-from st2-from)))
 
-      (minimize-state-machine sm-product))))
+      (if minimize
+          (minimize-state-machine sm-product)
+          sm-product))))
 
-(defgeneric synchronized-product (sm1 sm2 &key boolean-function))
+(defgeneric synchronized-product (sm1 sm2 &key boolean-function minimize))
 
-(defmethod synchronized-product ((sm1 state-machine) (sm2 state-machine) &key (boolean-function (lambda (a b) (and a b))))
+(defmethod synchronized-product ((sm1 state-machine) (sm2 state-machine) &key (minimize t) (boolean-function (lambda (a b) (and a b))))
   (declare (optimize (speed 3) (debug 0) (compilation-speed 0))
 	   (type (function (t t) t) boolean-function))
   (if (eq (class-of sm1)
 	  (class-of sm2))
-      (populate-synchronized-product (make-instance (class-of sm1)) sm1 sm2 :boolean-function boolean-function)
+      (populate-synchronized-product (make-instance (class-of sm1)) sm1 sm2 :boolean-function boolean-function :minimize minimize)
       (error "Cannot create synchronized product of ~A and ~A" (class-of sm1) (class-of sm2))))
