@@ -23,7 +23,13 @@
 
 (defgeneric ndfa-to-dot (object stream &rest others &key state-legend transition-legend transition-abrevs transition-label-cb view prefix title))
 
-(defmethod ndfa-to-dot ((ndfa state-machine) stream &key (state-legend :dot) (transition-legend nil) transition-abrevs (transition-label-cb (lambda (label name) (declare (ignore label name)))) (view nil) prefix title)
+(defun transition-label-cb (label name)
+  (declare (ignore label name))
+  nil)
+
+(defmethod ndfa-to-dot ((ndfa state-machine) stream &key (state-legend :dot) (transition-legend nil) transition-abrevs
+                                                      (transition-label-cb #'transition-label-cb)
+                                                      (view nil) prefix title)
   "Generate a dot file (for use by graphviz).  The dot file illustrates the states
 and and transitions of the NDFA state machine.  The dot file is written to STREAM
 which may be any valid first argument of FORMAT, but is usually t or a stream object.
@@ -37,6 +43,7 @@ TRANSITION-ABREVS (a car/cadr alist) mapping type specifiers to symbolic labels.
   (declare (ignore view)
 	   (type (or null string) title)
 	   (type (or (member t nil) stream))
+           (type (function (t t) t) transition-label-cb)
 	   (ignore prefix))
   (flet ((stringify (data)
 	   (cond ((null data)
