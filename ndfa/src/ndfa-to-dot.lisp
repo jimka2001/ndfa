@@ -21,13 +21,14 @@
 
 (in-package :ndfa)
 
-(defgeneric ndfa-to-dot (object stream &rest others &key state-legend transition-legend transition-abrevs transition-label-cb view prefix title))
+(defgeneric ndfa-to-dot (object stream &rest others &key state-legend transition-legend equal-transition-labels transition-abrevs transition-label-cb view prefix title))
 
 (defun transition-label-cb (label name)
   (declare (ignore label name))
   nil)
 
 (defmethod ndfa-to-dot ((ndfa state-machine) stream &key (state-legend :dot) (transition-legend nil) transition-abrevs
+                                                      (equal-transition-labels #'equal)
                                                       (transition-label-cb #'transition-label-cb)
                                                       (view nil) prefix title)
   "Generate a dot file (for use by graphviz).  The dot file illustrates the states
@@ -57,7 +58,7 @@ TRANSITION-ABREVS (a car/cadr alist) mapping type specifiers to symbolic labels.
 	 (new-transition-name (transition-label)
 	   (let ((transition-index 1)
 		 (proposed-name "T1"))
-	     (loop :while (rassoc proposed-name transition-abrevs :test #'equal :key #'car)
+	     (loop :while (rassoc proposed-name transition-abrevs :test #'string= :key #'car)
 		   :do (progn (incf transition-index)
 			      (setf proposed-name (format nil "T~d" transition-index))))
              (funcall transition-label-cb transition-label proposed-name)
@@ -102,10 +103,10 @@ TRANSITION-ABREVS (a car/cadr alist) mapping type specifiers to symbolic labels.
                                         (not transition-abrevs))
 				   (stringify transition-label))
 				  (t
-				   (unless (assoc transition-label transition-abrevs :test #'equal)
+				   (unless (assoc transition-label transition-abrevs :test equal-transition-labels)
 				     (push (list transition-label (new-transition-name transition-label))
 					   transition-abrevs))
-				   (cadr (assoc transition-label transition-abrevs :test #'equal))))))
+				   (cadr (assoc transition-label transition-abrevs :test equal-transition-labels))))))
 
 			 (format stream "    ~D -> ~D [label=~S]~%"
 				 (gethash (state-label state) state-map)
@@ -183,7 +184,7 @@ the .dot file will be printed to a temporary file in /tmp (see MAKE-TEMP-FILE)."
 	     args)
       (call-next-method)))
 
-(defmethod ndfa-to-dot ((ndfa state-machine) (path pathname) &key (state-legend :dot) (transition-legend nil) transition-abrevs (transition-label-cb #'transition-label-cb) (view nil) prefix title)
+(defmethod ndfa-to-dot ((ndfa state-machine) (path pathname) &key (state-legend :dot) (transition-legend nil) transition-abrevs (transition-label-cb #'transition-label-cb) (view nil) prefix title equal-transition-labels)
   "Calling NDFA-TO-DOT with a PATH whose type is \"dot\" creates the dot file, which is valid input for the
 graphviz dot program.   If PATH has type \"png\", a temporary dot file will be created, and
 will be converted to a png file which will be displayed using open -n.  This works for MAC only."
@@ -191,10 +192,10 @@ will be converted to a png file which will be displayed using open -n.  This wor
   (cond ((string= "dot" (pathname-type path))
 	 (with-open-file (stream path :direction :output :if-exists :rename)
            (format t "writing to ~A~%" stream)
-	   (ndfa-to-dot ndfa stream :state-legend state-legend :transition-legend transition-legend :transition-abrevs transition-abrevs :transition-label-cb transition-label-cb :view nil :prefix prefix :title title)))
+	   (ndfa-to-dot ndfa stream :state-legend state-legend :transition-legend transition-legend :transition-abrevs transition-abrevs :transition-label-cb transition-label-cb :view nil :prefix prefix :title title :equal-transition-labels equal-transition-labels)))
 	((string= "png" (pathname-type path))
 	 (let ((dotpath (merge-pathnames (make-pathname :type "dot")  path)))
-	   (ndfa-to-dot ndfa dotpath :state-legend state-legend :transition-legend transition-legend :transition-abrevs transition-abrevs :transition-label-cb transition-label-cb :view nil :prefix prefix :title title)
+	   (ndfa-to-dot ndfa dotpath :state-legend state-legend :transition-legend transition-legend :transition-abrevs transition-abrevs :transition-label-cb transition-label-cb :view nil :prefix prefix :title title :equal-transition-labels equal-transition-labels)
 	   (run-program *dot-path* (list "-Tpng" (namestring dotpath) "-o" (namestring path)))
 	   #+:os-macosx (when view (run-program "open" (list "-n" (namestring path))))))
 	(t
