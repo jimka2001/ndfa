@@ -220,7 +220,7 @@ RETURNS the given DFA perhaps after having some if its states removed."
 	reduced-dfa
 	))))
 
-(defgeneric populate-synchronized-product (sm-product sm1 sm2 &key boolean-function union-labels match-label minimize)
+(defgeneric populate-synchronized-product (sm-product sm1 sm2 &key boolean-function minimize merge-transition-labels complement-transition-label)
   (:documentation
    "Given two state machines for which we wish to calculate the cross-product,
  and a product state machine which has be allocated (as if by make-instance), update the product state machine
@@ -229,16 +229,12 @@ RETURNS the given DFA perhaps after having some if its states removed."
  :BOOLEAN-FUNCTION -- This function is used to determine whether a newly created state (in the synchronized 
    product) needs to be a final state.  If the synchronized product is being calculated to compute the AND of
    two state machines then the BOOLEAN-FUNCTION should be (lambda (a b) (and a b)).
- :UNION-LABELS -- This function is used to calculate the list of transition labels for a newly
-   created state in the synchronized product, given the list of transition labels from the original two
-   states.  This defaults to #'union.  This option is important for the method of 
-   POPULATE-SYNCHRONIZED-PRODUCT specializing on RTE-STATE-MACHINE which uses a curried form of
-   #'MDTD-BDD.
- :MATCH-LABEL -- Find a transition given a label.  This function will be called with two arguments in
-   a dependable order; 1st the label being sought, 2nd the label of one of the existing transitions.
-   The ability to search for a transition with a predicate other than equality is important for the 
-   method of POPULATE-SYNCHRONIZED-PRODUCT specializing on RTE-STATE-MACHINE which uses #'subtypep
-   for this predicate.
+ :MERGE-TRANSITION-LABELS - when calculating the cross product of two state, we must examine
+   every possible pairing of transitions from two given states.  This function, MERGE-TRANSITION-LABELS, is
+   called on two such labels to calculate the label for the transition to the new state in the
+   cross-product machine.
+ :COMPLEMENT-TRANSITION-LABEL - given a state, return a transition label that represents
+   all the transitions to the sync state.
  :FINAL-STATE-CALLBACK -- a callback function to be called each time a new final state in the synchronized 
    product has been added, and after the transitions have been added, but before the state machine
    has been trimmed and reduced."))
@@ -248,13 +244,18 @@ RETURNS the given DFA perhaps after having some if its states removed."
 					  (sm2 state-machine)
 					  &key (boolean-function (lambda (a b) (and a b)))
                                             (minimize t)
-					    (union-labels #'union)
-					    (match-label #'eql)
+                                            (merge-transition-labels
+                                             (lambda (label-1 label-2)
+                                               (error "need to merge ~A and ~A, no merge-transition-labels given to populate-synchronized-product"
+                                                      label-1 label-2)))
+                                            (complement-transition-label
+                                             (lambda (state)
+                                               (error "need to calculate complement transition for ~A, no complement-transition-label given to populate-synchronized-product" state)))
 					    (final-state-callback (lambda (product-final-state final-state-1 final-state-2)
 								    (declare (ignore product-final-state final-state-1 final-state-2))
 								    nil)))
-  (declare (type (function (t t) t) match-label boolean-function)
-	   (type (function (list list) list) union-labels)
+  (declare (type (function (t t) t) merge-transition-labels boolean-function)
+           (type (function ((or state null)) t) complement-transition-label)
 	   (type (function ((or null state) (or null state) (or null state)) t) final-state-callback)
 	   (optimize (speed 3) (debug 0) (compilation-speed 0)))
   (let ((label 0)
@@ -289,19 +290,6 @@ RETURNS the given DFA perhaps after having some if its states removed."
 			   (gethash new-state state->states) (list st1 st2))
 		     (tconc buf new-state)
 		     new-state)))
-	     (match-transition (st-from label)
-	       (find-if (lambda (transition)
-			  (funcall match-label label (transition-label transition)))
-			(transitions st-from)))
-	     (match-next-state (st-from label &aux (matching-transition (and st-from (match-transition st-from label))))
-	       ;; matching-transition is either a transition object or nil
-	       (cond
-		 ((null st-from) nil)
-		 (matching-transition
-		  (next-state matching-transition))
-		 (t
-		   nil)))
-	       
 	     (make-initial-states ()
 	       (dolist (st1 (get-initial-states sm1))
 		 (dolist (st2 (get-initial-states sm2))
@@ -310,13 +298,35 @@ RETURNS the given DFA perhaps after having some if its states removed."
       (make-initial-states)
       (dolist-tconc (product-state buf)
 	(destructuring-bind (st1-from st2-from) (gethash product-state state->states)
-	  (dolist (transition-label (funcall union-labels
-					     (and st1-from (mapcar #'transition-label (transitions st1-from)))
-					     (and st2-from (mapcar #'transition-label (transitions st2-from)))))
-	    (let* ((next-state-1 (match-next-state st1-from transition-label))
-		   (next-state-2 (match-next-state st2-from transition-label))
-		   (next-product-state (product-state next-state-1 next-state-2)))
-	      (add-transition product-state :next-label (state-label next-product-state) :transition-label transition-label)))))
+          (let ((transitions1 (and st1-from (transitions st1-from)))
+                (transitions2 (and st2-from (transitions st2-from))))
+            (dolist (transition-1 (cons nil transitions1))
+              (dolist (transition-2 (cons nil transitions2))
+                (let ((transition-label-1 (if (null transition-1)
+                                              (funcall complement-transition-label st1-from)
+                                              (transition-label transition-1)))
+                      (transition-label-2 (if (null transition-2)
+                                              (funcall complement-transition-label st2-from)
+                                              (transition-label transition-2))))
+                  (let ((new-transition-label (funcall merge-transition-labels transition-label-1 transition-label-2))
+                        (next-state-1 (and transition-1 (next-state transition-1)))
+                        (next-state-2 (and transition-2 (next-state transition-2))))
+                    ;; Is it possible that the same new-transition-label appears twice?
+                    ;; No, unless it is nil.
+                    ;; Why?  Because transition-labels-1 is a list of disjoint types,
+                    ;;           and transition-labels-2 is a list of disjoint types.
+                    ;;       Suppose A,B are in transitions-labels-1,
+                    ;;       and     X,Y are in transitions-labels-2.
+                    ;;       AX is a subset of A, and BY is a subset of B
+                    ;;       and A and B are disjoint; therefore AX and BY are disjoint.
+                    ;;       Note that the empty set is disjoint from itself, so it might happen that
+                    ;;       AX = BY = nil.
+                    (when (and new-transition-label
+                               (or next-state-1
+                                   next-state-2))
+                      (let ((next-product-state (product-state next-state-1 next-state-2)))
+                        (add-transition product-state :next-label (state-label next-product-state)
+                                                      :transition-label new-transition-label))))))))))
 
       (dolist (final-state (get-final-states sm-product))
 	(destructuring-bind (st1-from st2-from) (gethash final-state state->states)
@@ -333,5 +343,7 @@ RETURNS the given DFA perhaps after having some if its states removed."
 	   (type (function (t t) t) boolean-function))
   (if (eq (class-of sm1)
 	  (class-of sm2))
-      (populate-synchronized-product (make-instance (class-of sm1)) sm1 sm2 :boolean-function boolean-function :minimize minimize)
+      (populate-synchronized-product (make-instance (class-of sm1)) sm1 sm2
+                                     :boolean-function boolean-function
+                                     :minimize minimize)
       (error "Cannot create synchronized product of ~A and ~A" (class-of sm1) (class-of sm2))))
