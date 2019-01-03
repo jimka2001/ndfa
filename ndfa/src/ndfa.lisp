@@ -97,7 +97,7 @@ of STATE-MACHINE. The list of states of the machine may be specified as the
 (defclass state ()
   ((label :initarg :label :reader state-label
 	  :documentation "An object, usually a number, string, symbol, list indentifying this state.
-Code which manipulate state transitions, use this label to identify intended states before the states
+Code which manipulates state transitions, uses this label to identify intended states before the states
 have yet been created as part of the initialization process.  The label is also used within PRINT-OBJECT.
 It is not allowed to have two different states in the same state-machine which have the same label
 according to the EQUAL function.")
