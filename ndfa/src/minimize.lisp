@@ -122,7 +122,7 @@ RETURNS the given DFA perhaps after having some if its states removed."
 	       ;; Partition is a set (list of states) into one or more
 	       ;; lists such that each resulting list has the property
 	       ;; that all its element have the same value of
-	       ;; PARTITION-TRANSITION.  Here 'same' mean contains the
+	       ;; PARTITION-TRANSITION.  Here 'same' means contains the
 	       ;; same elements in some order. (NOT (SET-EXCLUSIVE-OR
 	       ;; ...))
 	       ;; 
