@@ -44,7 +44,8 @@ TRANSITION-ABREVS (a car/cadr alist) mapping type specifiers to symbolic labels.
   (declare (ignore view)
 	   (type (or null string) title)
 	   (type (or (member t nil) stream))
-           (type (function (t t) t) transition-label-cb)
+           (type (function (t t) t) transition-label-cb
+                 equal-transition-labels)
 	   (ignore prefix))
   (flet ((stringify (data)
 	   (cond ((null data)

@@ -23,47 +23,48 @@
   (:use :cl :adjuvant)
   (:nicknames "NDFA")
   (:export "ADD-STATE"
-	   "CLAUSE-INDEX"
-	   "DETERMINISTICP"
-	   "FIND-TRANSIT"
-	   "GET-FINAL-STATES"
-	   "GET-INITIAL-STATES"
-	   "GET-STICKY-STATES"
-	   "NDFA-TO-DOT"
-	   "NEXT-LABEL"
-	   "NEXT-STATE"
-	   "PERFORM-SOME-TRANSITIONS"
-	   "PERFORM-TRANSITIONS"
-	   "POPULATE-SYNCHRONIZED-PRODUCT"
-	   "MINIMIZE-STATE-MACHINE"
-	   "STATE-EXIT-FORM"
-	   "STATE-FINAL-P"
-	   "STATE-LABEL"
-	   "STATE-MACHINE"
-	   "STATE-NAME"
-	   "STATE-STICKY-P"
-	   "STATES"
-	   "SYNCHRONIZED-PRODUCT"
-	   "TRANSITION-LABEL-COMBINE"
-	   "TRANSITION-LABEL-EQUAL"
-	   "TRANSITION-LABEL"
-	   "TRANSITIONS"
-	   "TRIM-STATE-MACHINE"
-	   "MAKE-NDFA" ))
+           "CLAUSE-INDEX"
+           "DETERMINISTICP"
+           "FIND-TRANSIT"
+           "GET-FINAL-STATES"
+           "GET-INITIAL-STATES"
+           "GET-STICKY-STATES"
+           "NDFA-TO-DOT"
+           "NEXT-LABEL"
+           "NEXT-STATE"
+           "PERFORM-SOME-TRANSITIONS"
+           "PERFORM-TRANSITIONS"
+           "POPULATE-SYNCHRONIZED-PRODUCT"
+           "MINIMIZE-STATE-MACHINE"
+           "STATE-EXIT-FORM"
+           "STATE-FINAL-P"
+           "STATE-LABEL"
+           "STATE-MACHINE"
+           "STATE-NAME"
+           "STATE-STICKY-P"
+           "STATES"
+           "SYNCHRONIZED-PRODUCT"
+           "TRANSITION-LABEL-OMIT"
+           "TRANSITION-LABEL-COMBINE"
+           "TRANSITION-LABEL-EQUAL"
+           "TRANSITION-LABEL"
+           "TRANSITIONS"
+           "TRIM-STATE-MACHINE"
+           "MAKE-NDFA" ))
 
 (in-package :ndfa)
 
 (defclass state-machine ()
   ((states :initarg :states :initform nil :accessor states
-	   :documentation "List of elements of class STATE")
+           :documentation "List of elements of class STATE")
    (deterministicp :initform nil :initarg :deterministicp :accessor deterministicp)
    (final-states :accessor get-final-states)
    (sticky-states :accessor get-sticky-states)
    (initial-states :accessor get-initial-states
-		   :documentation "Subset of the STATES slot indicating which of the states are initial,
+                   :documentation "Subset of the STATES slot indicating which of the states are initial,
  ie. which of the states answer TRUE to the STATE-INITIAL-P predicate.")
    (test :initform #'eql :initarg :test :reader test :type (function (t t) t)
-	 :documentation ":KEY :TEST are the idiomatic key/test pair common to many
+         :documentation ":KEY :TEST are the idiomatic key/test pair common to many
 lisp functions. The function PERFORM-SOME-TRANSITIONS uses these two function to
 iteratively determine whether each element of its INPUT sequence is
 accepted or rejected. 
@@ -74,16 +75,21 @@ accepted or rejected.
    transition-label - the value returned from (TRANSITION-LABEL transition)
                 is passed as the 2nd argument of the :TEST function")
    (key  :initform #'identity :initarg :key :reader key :type (function (t) t))
+   (transition-label-omit :initform (constantly nil)
+                          :reader transition-label-omit
+                          :type (function (t) t)
+                          :documentation "When building a state-machine the add-transition method will 
+ silently omit a transition when this function returns to on its label.")
    (transition-label-combine :initform nil :initarg :transition-label-combine
-			     :reader transition-label-combine
-			     :type (or null (function (t t) t))
-			     :documentation "When reducing a state machine, this function
+                             :reader transition-label-combine
+                             :type (or null (function (t t) t))
+                             :documentation "When reducing a state machine, this function
  takes two transition labels and returns a new label representing
  the combination of the two given. nil => don't combine parallel transitions.")
    (transition-label-equal :initform #'eql :initarg :transition-label-equal
-			   :type (function (t t) t)
-			   :reader transition-label-equal
-			   :documentation "When reducing a state-machine, this function indicates 
+                           :type (function (t t) t)
+                           :reader transition-label-equal
+                           :documentation "When reducing a state-machine, this function indicates 
 how to determine whether two transition labels are considered equal."))
   (:documentation "A finite state machine.  An application program is expected to maintain
 a list of states, each an element of (STATES ...), and use either the function
@@ -96,87 +102,87 @@ of STATE-MACHINE. The list of states of the machine may be specified as the
 
 (defclass state ()
   ((label :initarg :label :reader state-label
-	  :documentation "An object, usually a number, string, symbol, list indentifying this state.
+          :documentation "An object, usually a number, string, symbol, list indentifying this state.
 Code which manipulates state transitions, uses this label to identify intended states before the states
 have yet been created as part of the initialization process.  The label is also used within PRINT-OBJECT.
 It is not allowed to have two different states in the same state-machine which have the same label
 according to the EQUAL function.")
    (state-number :initform (incf *state-number*) :reader state-number)
    (ndfa :initarg :ndfa :reader ndfa :type state-machine
-	 :documentation "The instance of STATE-MACHINE for which this instance of STATE is state of.  I.e.,
+         :documentation "The instance of STATE-MACHINE for which this instance of STATE is state of.  I.e.,
 this STATE instance is a member of (STATES (STATE-MACHINE state))")
    (transitions :type list :initform nil :accessor transitions
-		:documentation "List of instances of class TRANSITION")
+                :documentation "List of instances of class TRANSITION")
    (initial-p :initarg :initial-p :initform nil :reader state-initial-p
-	      :documentation "Indicates whether the state is an initial state of the state machine.")
+              :documentation "Indicates whether the state is an initial state of the state machine.")
    (sticky-p :initarg :sticky-p :initform nil :accessor state-sticky-p
-	     :documentation "A state is sticky if once the NDFA gets into this state, it cannot leave.")
+             :documentation "A state is sticky if once the NDFA gets into this state, it cannot leave.")
    (clause-index :initarg :clause-index :accessor clause-index :initform 0 :type (or null unsigned-byte))
    (exit-form :initarg :exit-form :accessor state-exit-form)
    (final-p :initarg :final-p :initform nil :reader state-final-p
-	    :documentation "Indicates whether the state is a final state of the state machine."))
+            :documentation "Indicates whether the state is a final state of the state machine."))
   (:documentation "Instances of this class comprise the values of the STATES slot of
 an instance of class STATE-MACHINE."))
 
 (defmethod slot-unbound ((class standard-class) (state state) (slot-name (eql 'exit-form)))
   (setf (slot-value state slot-name)
-	(if (state-final-p state)
-	    t
-	    nil)))
+        (if (state-final-p state)
+            t
+            nil)))
 
 (defgeneric state-name (state))
 
 (defmethod state-name ((state state))
   ;; (intern (with-output-to-string (str)
-  ;; 	    (write (state-label state)
-  ;; 		   :stream str
-  ;; 		   :pretty nil
-  ;; 		   :escape t))
-  ;; 	  (symbol-package 'state-name))
+  ;;        (write (state-label state)
+  ;;               :stream str
+  ;;               :pretty nil
+  ;;               :escape t))
+  ;;      (symbol-package 'state-name))
   (slot-value state 'state-number)
   )
 
 (defmethod slot-unbound ((class standard-class) (ndfa state-machine) (slot-name (eql 'initial-states)))
   "Calculate the list of initial states and setf it as the value of the INITIAL-STATES slot."
   (setf (slot-value ndfa slot-name) (mapcan #'(lambda (state)
-						(when (state-initial-p state)
-						  (list state)))
-					    (states ndfa))))
+                                                (when (state-initial-p state)
+                                                  (list state)))
+                                            (states ndfa))))
 
 (defmethod slot-unbound ((class standard-class) (ndfa state-machine) (slot-name (eql 'sticky-states)))
   "Calculate the list of initial states and setf it as the value of the STICKY-STATES slot."
   (setf (slot-value ndfa slot-name) (mapcan #'(lambda (state)
-						(when (state-sticky-p state)
-						  (list state)))
-					    (states ndfa))))
+                                                (when (state-sticky-p state)
+                                                  (list state)))
+                                            (states ndfa))))
 
 (defmethod slot-unbound ((class standard-class) (ndfa state-machine) (slot-name (eql 'final-states)))
   "Calculate the list of initial states and setf it as the value of the FINAL-STATES slot."
   (setf (slot-value ndfa slot-name) (mapcan #'(lambda (state)
-						(when (state-final-p state)
-						  (list state)))
-					    (states ndfa))))
+                                                (when (state-final-p state)
+                                                  (list state)))
+                                            (states ndfa))))
 
 (defmethod print-object ((self state) stream)
   (if (slot-boundp self 'label)
       (print-unreadable-object (self stream :type t :identity nil)
-	(format stream "~A" (state-label self))
-	(when (state-initial-p self)
-	  (format stream "[I]"))
-	(when (state-final-p self)
-	  (format stream "[F]")))
-	
+        (format stream "~A" (state-label self))
+        (when (state-initial-p self)
+          (format stream "[I]"))
+        (when (state-final-p self)
+          (format stream "[F]")))
+        
       (call-next-method)))
 
 (defclass transition ()
   ((state :initarg :state :type state :accessor state)
    (next :initarg :next :type (or nil state) :reader next-state) ; initialized lazily based on value of next-label
    (transition-label :initarg :transition-label :accessor transition-label
-		     :documentation "An object such as number, string, symbol, list which designates the
+                     :documentation "An object such as number, string, symbol, list which designates the
 test controlling a transition to the state indicated by NEXT-LABEL.  For more details see
 the documentation of the TEST and KEY slots of the STATE-MACHINE class.")
    (next-label :initarg :next-label :reader next-label
-	       :documentation "A state label, indicating that this transition object represents a 
+               :documentation "A state label, indicating that this transition object represents a 
 state machine transition from the state STATE to the state whose LABEL is NEXT-LABEL. NEXT-LABEL
 is used in the initialization process.  Its value might indicate a state which has not yet been created.
 After all the transitions to all the states have been added, it is expected that each NEXT-LABEL is EQUAL
@@ -194,10 +200,10 @@ state object whose STATE-LABEL is EQUAL to this NEXT-LABEL"))
 
 (defmethod print-object ((self transition) stream)
   (if (and (slot-boundp self 'state)
-	   (slot-boundp (state self) 'label)
-	   (slot-boundp self 'next-label))
+           (slot-boundp (state self) 'label)
+           (slot-boundp self 'next-label))
       (print-unreadable-object (self stream :type t :identity nil)
-	(format stream "~A->~A" (state-label (state self)) (next-label self)))
+        (format stream "~A->~A" (state-label (state self)) (next-label self)))
       (call-next-method)))
 
 (defmethod slot-unbound ((class standard-class) (self transition) (slot-name (eql 'next)))
@@ -205,10 +211,10 @@ state object whose STATE-LABEL is EQUAL to this NEXT-LABEL"))
 This method lazily sets the NEXT slot of SELF to the STATE slot to that state."
   (let ((state (find (next-label self) (states (ndfa self)) :key #'state-label :test #'equal)))
     (if state
-	(setf (slot-value self slot-name) state)
-	(error "transition has next-label=~A indicating non-existing state: available labels are: ~A"
-	       (next-label self)
-	       (mapcar #'state-label (states (ndfa self)))))))
+        (setf (slot-value self slot-name) state)
+        (error "transition has next-label=~A indicating non-existing state: available labels are: ~A"
+               (next-label self)
+               (mapcar #'state-label (states (ndfa self)))))))
 
 (defgeneric perform-some-transitions (sm starting-states input-sequence))
 (defmethod perform-some-transitions ((ndfa state-machine) starting-states input-sequence)
@@ -223,28 +229,28 @@ There is a notable exception, if there is every a transition into a state which 
 and sticky, then a singleton list of that state is returned, and no further transition, 
 nor no further element fo the input-sequence is considered."
   (declare (type list starting-states)
-	   (type sequence input-sequence))
+           (type sequence input-sequence))
   (let ((current-states starting-states)
-	(deterministicp (deterministicp ndfa)))
+        (deterministicp (deterministicp ndfa)))
     ;; We specifically use MAP here becasue it works on sequences,
     ;; rather than simply on lists.
     (map nil
-	 (lambda (input &aux new-states)
-	   (dolist (state current-states)
-	     (block do-transitions
-	       (dolist (transition (transitions state))
-		 (when (funcall (test ndfa) (funcall (key ndfa) input) (transition-label transition))
-		   (let ((next-state (next-state transition)))
-		     (if (and (state-sticky-p next-state)
-			      (state-final-p next-state))
-			 (return-from perform-some-transitions (list next-state))
-			 (progn (pushnew next-state new-states)
-				(when deterministicp
-				  ;; if ndfa is deterministic, we need only find one transition
-				  (return-from do-transitions)))))))))
-	   ;; if current-states is nil, EVERY will return
-	   (setf current-states new-states))
-	   input-sequence)
+         (lambda (input &aux new-states)
+           (dolist (state current-states)
+             (block do-transitions
+               (dolist (transition (transitions state))
+                 (when (funcall (test ndfa) (funcall (key ndfa) input) (transition-label transition))
+                   (let ((next-state (next-state transition)))
+                     (if (and (state-sticky-p next-state)
+                              (state-final-p next-state))
+                         (return-from perform-some-transitions (list next-state))
+                         (progn (pushnew next-state new-states)
+                                (when deterministicp
+                                  ;; if ndfa is deterministic, we need only find one transition
+                                  (return-from do-transitions)))))))))
+           ;; if current-states is nil, EVERY will return
+           (setf current-states new-states))
+           input-sequence)
     (the list current-states)))
 
 (defgeneric perform-transitions (sm input-sequence))
@@ -263,20 +269,27 @@ None, some, or all of these states might be final states of the state machine."
 
 (defmethod add-transition ((state state) &key next-label transition-label (equal-label #'eql))
   "Create and return an instance of TRANSITION from STATE to the state designated by NEXT-LABEL.
-Note, that the state indicated by NEXT-LABEL might not yet exist."
+ Note, that the state indicated by NEXT-LABEL might not yet exist."
   (cond
+    ;; some transitions should be omitted.  For example, the subclass rte-state-machine
+    ;;  omits labels eq to nil, as those are nil types, and the transition is never
+    ;;  taken in reality.
+    ((funcall (transition-label-omit (ndfa state)) transition-label)
+     nil)
     ;; if such a transition already exists, then just return it without creating a new one
     ((find-if (lambda (transition)
-		(and (eql (next-label transition) next-label)
-		     (funcall equal-label transition-label (transition-label transition))))
-	      (transitions state)))
+                (and (eql (next-label transition) next-label)
+                     (funcall equal-label transition-label (transition-label transition))))
+              (transitions state)))
     ;; if a transition already exists the label then error
     ((exists transition (transitions state)
        (funcall equal-label transition-label (transition-label transition)))
-     (error "a transition already exists with label ~A~%" transition-label))
+     (error "a transition already exists with label ~A, state transition labels=~A~%"
+            transition-label
+            (mapcar #'transition-label (transitions state))))
     (t
      (car (push (make-instance 'transition :state state :next-label next-label :transition-label transition-label)
-		(transitions state))))))
+                (transitions state))))))
 
 (defgeneric add-state (object &key label initial-p final-p transitions exit-form clause-index))
 
@@ -293,27 +306,27 @@ Note, that the state indicated by NEXT-LABEL might not yet exist."
     (cond
       (existing-state
        (when initial-p
-	 (setf (slot-value existing-state 'initial-p) t))
+         (setf (slot-value existing-state 'initial-p) t))
        (when final-p
-	 (setf (slot-value existing-state 'final-p) t))
+         (setf (slot-value existing-state 'final-p) t))
        existing-state)
       (t
        (let ((new-state (make-instance 'state
-				       :ndfa ndfa
-				       :clause-index clause-index
-				       :label label
-				       :initial-p initial-p
-				       :final-p final-p)))
-	 (when final-p
-	   (slot-makunbound ndfa 'final-states)
-	   (setf (state-exit-form new-state) exit-form))
-	 (when initial-p
-	   (slot-makunbound ndfa 'initial-states))
-	 (slot-makunbound ndfa 'sticky-states)
-	 (dolist (transition transitions)
-	   (apply #'add-transition new-state transition))
-	 (push new-state (states ndfa))
-	 new-state)))))
+                                       :ndfa ndfa
+                                       :clause-index clause-index
+                                       :label label
+                                       :initial-p initial-p
+                                       :final-p final-p)))
+         (when final-p
+           (slot-makunbound ndfa 'final-states)
+           (setf (state-exit-form new-state) exit-form))
+         (when initial-p
+           (slot-makunbound ndfa 'initial-states))
+         (slot-makunbound ndfa 'sticky-states)
+         (dolist (transition transitions)
+           (apply #'add-transition new-state transition))
+         (push new-state (states ndfa))
+         new-state)))))
 
 (defun make-ndfa (state-designators &rest initargs)
   "Factory function for generating an instance of STATE-MACHINE.  STATE-DESIGNATORS is
@@ -331,23 +344,23 @@ of valid states. An ERROR is signaled if such removing makes a state
 non-coaccessible."
   (dolist (state (states dfa) dfa)
     (setf (transitions state)
-	  (setof transition (transitions state)
-	    (member (next-state transition) valid-states :test #'eq)))
+          (setof transition (transitions state)
+            (member (next-state transition) valid-states :test #'eq)))
     (unless (or (transitions state)
-		(state-final-p state))
+                (state-final-p state))
       ;; finals states are the only ones which are allowed to have no transitions
       (error "after removing invalid transitions, a state ~A has become non-coaccessible; this appears to be an internal error"
-	     state))))
+             state))))
 
 (defun remove-invalid-states (ndfa valid-states)
   "Remove all states from (states ndfa), (get-final-states ndfa), 
  (get-sticky-states ndfa) and (get-initial-states ndfa)
  which are not in VALID-STATES."
   (declare (type state-machine ndfa)
-	   (type list valid-states))
+           (type list valid-states))
 
   (setf (states ndfa)
-	(intersection (states ndfa) valid-states))
+        (intersection (states ndfa) valid-states))
 
   (slot-makunbound ndfa 'sticky-states)
   (slot-makunbound ndfa 'final-states)

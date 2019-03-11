@@ -92,7 +92,7 @@ RETURNS the given DFA perhaps after having some if its states removed."
  the combination of the two given.
  :EQUAL-LABELS -- equivalence function for transition labels."
   (declare (type state-machine dfa)
-	   (type (or null (function (t t) t)) combine))
+	   (type (or null (function (t t) t)) combine equal-labels))
   (trim-state-machine dfa)
   (let ((partitions (cons (set-difference (states dfa) (get-final-states dfa))
 			  (mapcar #'cadr (group-by (get-final-states dfa) :key #'state-exit-form :test #'equal)))))
@@ -202,7 +202,7 @@ RETURNS the given DFA perhaps after having some if its states removed."
 							      :test equal-labels)
 			:do (if combine
 				;; duplicate transition labels have already been removed, but
-				;;   we still need to compile labels which are different.
+				;;   we still need to combine labels which are different.
 				;;   e.g., number + string = (or number string)
 				;;   e.g., fixnum + (and number (not fixnum)) = number
 				(add-transition from-state
