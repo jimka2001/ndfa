@@ -371,3 +371,43 @@ non-coaccessible."
   (remove-invalid-transitions ndfa valid-states)
 
   ndfa)
+
+(defun relabel-states (ndfa cmp-labels)
+  (declare (type (function (t t) t) cmp-labels)
+           (type state-machine ndfa))
+  (let ((buf (list nil nil)))
+    (dolist (state (get-initial-states ndfa))
+      (tconc buf state))
+    (let (all-states)
+      (dolist-tconc (state buf)
+        (unless (member state all-states :test #'eq)
+          (push state all-states)
+          (dolist (transition (sort (copy-list (transitions state))
+                                    cmp-labels
+                                    :key #'transition-label))
+            (tconc buf (next-state transition)))))
+      (setf all-states (nreverse all-states))
+      (let* ((new-label -1)
+             (new-names (mapcar (lambda (state)
+                                  (list state (incf new-label)))
+                                all-states))
+             ;; now associate a tmp name with each state which is not in the set of current names
+             ;; nor in the set of new-names
+             (tmp-names (progn (incf new-label)
+                               (mapcar (lambda (state)
+                                         (while (exists state all-states
+                                                  (equal new-label (state-label state)))
+                                           (incf new-label))
+                                         (prog1 (list state new-label)
+                                           (incf new-label)))
+                                       all-states))))
+        (flet ((rename-states (alist)
+                 (dolist (state all-states)
+                   (setf (slot-value state 'label) (cadr (assoc state alist)))
+                   (dolist (transition (transitions state))
+                     (setf (slot-value transition 'next-label) (cadr (assoc (next-state transition) alist)))))))
+          (rename-states tmp-names)
+          (rename-states new-names)
+
+          (format t "renamed ~A~%" all-states)
+          )))))
