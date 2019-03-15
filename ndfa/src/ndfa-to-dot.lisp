@@ -30,11 +30,11 @@
 (defun ndfa-state< (state1 state2)
   (cmp-objects (state-label state1) (state-label state2)))
 
-(defmethod ndfa-to-dot ((ndfa state-machine) stream &key (state-legend :dot) (transition-legend nil) transition-abrevs
-                                                      (equal-transition-labels #'equal)
+(defmethod ndfa-to-dot ((ndfa state-machine) stream &key transition-abrevs
                                                       (transition-label-cb #'transition-label-cb)
                                                       (view nil) prefix title
-                                                      (state< #'ndfa-state<))
+                                                      (state< #'ndfa-state<)
+                                                      &allow-other-keys )
   "Generate a dot file (for use by graphviz).  The dot file illustrates the states
 and and transitions of the NDFA state machine.  The dot file is written to STREAM
 which may be any valid first argument of FORMAT, but is usually t or a stream object.
@@ -49,7 +49,7 @@ TRANSITION-ABREVS (a car/cadr alist) mapping type specifiers to symbolic labels.
 	   (type (or null string) title)
 	   (type (or (member t nil) stream))
            (type (function (t t) t) transition-label-cb
-                 state< equal-transition-labels)
+                 state<)
 	   (ignore prefix))
   (flet ((stringify (data)
 	   (cond ((null data)
@@ -67,10 +67,11 @@ TRANSITION-ABREVS (a car/cadr alist) mapping type specifiers to symbolic labels.
 		   :do (progn (incf transition-index)
 			      (setf proposed-name (format nil "T~d" transition-index))))
              (funcall transition-label-cb transition-label proposed-name)
-	     proposed-name)))
+	     proposed-name))
+         (state-label-for-dot (state)
+           (state-number state)))
     (format stream "digraph G {~%")
     (let ((*print-case* :downcase)
-          (state-map (make-hash-table :test #'equal))
           (graph-label (make-string-output-stream))
 	  (hidden 0)
           (states (sort (copy-list (states ndfa))
@@ -82,55 +83,40 @@ TRANSITION-ABREVS (a car/cadr alist) mapping type specifiers to symbolic labels.
       (format stream "  graph [labeljust=l,nojustify=true];~%")
       (format stream "  node [fontname=Arial, fontsize=25];~%")
       (format stream "  edge [fontname=Helvetica, fontsize=20];~%")
-      (let ((state-num 0))
-	(dolist (state states)
-	  (setf (gethash (state-label state) state-map) state-num)
-	  (incf state-num)))
+      
+      (when (find-duplicates states :key #'state-label-for-dot :test #'equal)
+        (error "multiple states with same label: ~A" (find-duplicates states :key #'state-label-for-dot :test #'equal)))
       (dolist (state states)
-	(format stream "  /* ~Astate ~D */~%"
+	(format stream "  /* ~Astate ~D ~A */~%"
                 (if (state-sticky-p state) "sticky " "")
-                (gethash (state-label state) state-map))
-        (cond
-          ((null state-legend)
-	   ;; if state-legend is nil, that means we tell graphvis to diplay the
-	   ;;   name the states according to the state-label of the state.
-	   (format stream "  ~D [label=\"~A\"" (gethash (state-label state) state-map) (state-label state))
-           (when (state-sticky-p state)
-             (format stream " style=dashed"))
-           (format stream "]~%"))
-          ((state-sticky-p state)
-           (format stream "  ~D [style=dashed]~%"  (gethash (state-label state) state-map))))
+                (state-label-for-dot state)
+                state)
+
+        ;; incoming arrow to initial state
 	(when (state-initial-p state)
 	  (format stream "    H~D [label=\"\", style=invis, width=0]~%" hidden)
-	  (format stream "    H~D -> ~D;~%" hidden (gethash (state-label state) state-map))
+	  (format stream "    H~D -> ~D;~%" hidden (state-label-for-dot state))
 	  (incf hidden))
 
-	;; draw arrows from one state to the next for each transition.
+	(format stream "  ~D [" (state-label-for-dot state))
+        (when (state-sticky-p state)
+          (format stream "style=dashed"))
+	(format stream "]~%")
+        
+        ;; draw arrows from one state to the next for each transition.
 	;; except if two arrows have the same source and destination,
 	;; in which case draw one arrow with several comma separated labels.
-	(let ((hash (make-hash-table :test #'equal)))
-	  (dolist (transition (transitions state))
-	    (push (transition-label transition) (gethash (next-label transition) hash nil)))
-	  (maphash #'(lambda (next-label transition-labels)
-		       (flet ((get-label (transition-label)
-				(cond
-				  ((and (not transition-legend)
-                                        (not transition-abrevs))
-				   (stringify transition-label))
-				  (t
-				   (unless (assoc transition-label transition-abrevs :test equal-transition-labels)
-				     (push (list transition-label (new-transition-name transition-label))
-					   transition-abrevs))
-				   (cadr (assoc transition-label transition-abrevs :test equal-transition-labels))))))
+	(destructuring-dolist ((next-state transitions) (group-by (transitions state)
+                                                                  :key #'next-state :test #'eq))
+          (let ((label-text (with-output-to-string (str)
+			      (format str "~A" (transition-label (car transitions)))
+			      (dolist (transition transitions)
+				(format str ",~A" (new-transition-name (transition-label transition)))))))
+	    (format stream "    ~D -> ~D [label=~S]~%"
+                    (state-label-for-dot state)
+		    (state-label-for-dot next-state)
+                    label-text)))
 
-			 (format stream "    ~D -> ~D [label=~S]~%"
-				 (gethash (state-label state) state-map)
-				 (gethash next-label state-map)
-				 (with-output-to-string (str)
-				   (format str "~A" (get-label (car transition-labels)))
-				   (dolist (transition-label (cdr transition-labels))
-				     (format str ",~A" (get-label transition-label)))))))
-		   hash))
 	(cond
 	  ((null (state-final-p state))
 	   nil)
@@ -139,53 +125,14 @@ TRANSITION-ABREVS (a car/cadr alist) mapping type specifiers to symbolic labels.
 		   hidden ;;(clause-index state)
                    (state-exit-form state)
                    )
-	   (format stream "    ~D -> X~D ;~%" (gethash (state-label state) state-map) hidden)
+	   (format stream "    ~D -> X~D ;~%" (state-label-for-dot state) hidden)
 	   (incf hidden))
 	  (t
 	   (format stream "    H~D [label=\"\", style=invis, width=0]~%" hidden)
-	   (format stream "    ~D -> H~D ;~%" (gethash (state-label state) state-map) hidden)
+	   (format stream "    ~D -> H~D ;~%" (state-label-for-dot state) hidden)
 	   (incf hidden))))
 
-      (case state-legend
-	((:dot)
-	 (format graph-label "\\l")
-	 (maphash #'(lambda (label num)
-		      (format graph-label "~D = " num)
-		      (write label :pretty nil :escape t :stream graph-label :case :downcase)
-		      (format graph-label "\\l"))
-		  state-map))
-	((nil) nil)
-	(t
-	 (format graph-label "\\l")
-	 (maphash #'(lambda (label num)
-                      (unless (equal num label)
-		        ;; print state-legend to stdout
-		        (format t "state-num ~D = " num)
-		        (write label :pretty nil :escape t :stream t :case :downcase)
-		        (format t "~%")))
-		  state-map)))
-      
-      (when transition-legend
-	(format graph-label  "\\l")
-	(dolist (pair (reverse transition-abrevs))
-          (destructuring-bind (transition-label abbreviation) pair
-            (when (exists state states
-                    (exists transition (transitions state)
-                      (equal (transition-label transition) transition-label)))
-              (write abbreviation :pretty nil :escape nil :stream graph-label)
-              (write " = " :pretty nil :escape nil :stream graph-label)
-              (write transition-label :pretty nil :escape t :stream graph-label :case :downcase)
-              (format graph-label "\\l")
-              ))))
-      
-      (when (or title
-                state-legend
-                transition-legend)
-        (format stream "  labelloc = \"b\";~%")
-        (format stream "  label = \"~a\"~%"
-                (replace-all (get-output-stream-string graph-label)
-                             (format nil "~%")
-                             "\\l")))                
+                      
       (format stream "}~%"))))
 
 (defmethod ndfa-to-dot :around (ndfa (path string) &rest args)
