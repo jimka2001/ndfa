@@ -378,10 +378,10 @@ non-coaccessible."
 
   ndfa)
 
-(defun relabel-states (ndfa cmp-labels)
-  (declare (type (function (t t) t) cmp-labels)
-           (type state-machine ndfa))
-  (let ((buf (list nil nil)))
+(defgeneric relabel-states (ndfa))
+(defmethod relabel-states ((ndfa state-machine))
+  (let ((cmp-labels (transition-label-equal ndfa))(buf (list nil nil)))
+    (declare (type (function (t t) t) cmp-labels))
     (dolist (state (get-initial-states ndfa))
       (tconc buf state))
     (let (all-states)

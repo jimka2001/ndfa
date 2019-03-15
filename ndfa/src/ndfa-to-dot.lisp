@@ -51,6 +51,7 @@
            (type (function (t t) t) transition-label-cb
                  state<)
 	   (ignore prefix))
+  (relabel-states ndfa)
   (flet ((stringify (data)
 	   (cond ((null data)
 		  nil)
@@ -62,7 +63,7 @@
 		    (write data :case :downcase :stream str)))))
 	 (new-transition-name (transition)
 	   (let* ((transition-label (transition-label transition))
-                  (hit (assoc transition-label transition-abrevs :test #'equal))
+                  (hit (assoc transition-label transition-abrevs :test (transition-label-equal ndfa)))
                   (new-name (cond (hit
                                    (cadr hit))
                                   (t
