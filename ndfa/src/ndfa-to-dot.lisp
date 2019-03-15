@@ -34,17 +34,17 @@
                                                       (transition-label-cb #'transition-label-cb)
                                                       (view nil) prefix title
                                                       (state< #'ndfa-state<)
-                                                      &allow-other-keys )
+                        &allow-other-keys )
   "Generate a dot file (for use by graphviz).  The dot file illustrates the states
-and and transitions of the NDFA state machine.  The dot file is written to STREAM
-which may be any valid first argument of FORMAT, but is usually t or a stream object.
-TRANSITION-ABREVS (a car/cadr alist) mapping type specifiers to symbolic labels.
-   If such a type specifier is found in the ndfa, and TRANSITION-LEGEND is true,
-   then the name indicated in TRANSITION-ABREVS is used, otherwise a new symbolic name
-   is generated.   This feature allows you to create multiple NDFA graphs using the
-   same state transition lablels.
-   If STATE-LEGEND is nil, then state labels in the graphical output will correspond to
-   the (state-legend ...) of the state."
+ and and transitions of the NDFA state machine.  The dot file is written to STREAM
+ which may be any valid first argument of FORMAT, but is usually t or a stream object.
+ TRANSITION-ABREVS (a car/cadr alist) mapping type specifiers to symbolic labels.
+ If such a type specifier is found in the ndfa, and TRANSITION-LEGEND is true,
+ then the name indicated in TRANSITION-ABREVS is used, otherwise a new symbolic name
+ is generated.   This feature allows you to create multiple NDFA graphs using the
+ same state transition lablels.
+ If STATE-LEGEND is nil, then state labels in the graphical output will correspond to
+ the (state-legend ...) of the state."
   (declare (ignore view)
 	   (type (or null string) title)
 	   (type (or (member t nil) stream))
@@ -60,14 +60,20 @@ TRANSITION-ABREVS (a car/cadr alist) mapping type specifiers to symbolic labels.
 		 (t
 		  (with-output-to-string (str)
 		    (write data :case :downcase :stream str)))))
-	 (new-transition-name (transition-label)
-	   (let ((transition-index 1)
-		 (proposed-name "T1"))
-	     (loop :while (rassoc proposed-name transition-abrevs :test #'string= :key #'car)
-		   :do (progn (incf transition-index)
-			      (setf proposed-name (format nil "T~d" transition-index))))
-             (funcall transition-label-cb transition-label proposed-name)
-	     proposed-name))
+	 (new-transition-name (transition)
+	   (let* ((transition-label (transition-label transition))
+                  (hit (assoc transition-label transition-abrevs :test #'equal))
+                  (new-name (cond (hit
+                                   (cadr hit))
+                                  (t
+                                   (let ((proposed-name "T1")
+                                         (transition-index 1))
+                                     (while (rassoc proposed-name transition-abrevs :test #'string= :key #'car)
+                                       (incf transition-index)
+                                       (setf proposed-name (format nil "T~d" transition-index)))
+                                     (funcall transition-label-cb transition-label proposed-name)
+                                     proposed-name)))))             
+	     new-name))
          (state-label-for-dot (state)
            (state-number state)))
     (format stream "digraph G {~%")
@@ -109,9 +115,9 @@ TRANSITION-ABREVS (a car/cadr alist) mapping type specifiers to symbolic labels.
 	(destructuring-dolist ((next-state transitions) (group-by (transitions state)
                                                                   :key #'next-state :test #'eq))
           (let ((label-text (with-output-to-string (str)
-			      (format str "~A" (transition-label (car transitions)))
-			      (dolist (transition transitions)
-				(format str ",~A" (new-transition-name (transition-label transition)))))))
+			      (format str "~A" (new-transition-name (car transitions)))
+			      (dolist (transition (cdr transitions))
+				(format str ",~A" (new-transition-name transition))))))
 	    (format stream "    ~D -> ~D [label=~S]~%"
                     (state-label-for-dot state)
 		    (state-label-for-dot next-state)
