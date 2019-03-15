@@ -32,4 +32,5 @@
     ((:file "ndfa")
      (:file "ndfa-to-dot" :depends-on ("ndfa"))
      (:file "minimize" :depends-on ("ndfa"))
+     (:file "product" :depends-on ("ndfa"))
      (:file "transit" :depends-on ("ndfa"))))))
