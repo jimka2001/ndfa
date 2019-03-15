@@ -407,7 +407,4 @@ non-coaccessible."
                    (dolist (transition (transitions state))
                      (setf (slot-value transition 'next-label) (cadr (assoc (next-state transition) alist)))))))
           (rename-states tmp-names)
-          (rename-states new-names)
-
-          (format t "renamed ~A~%" all-states)
-          )))))
+          (rename-states new-names))))))
