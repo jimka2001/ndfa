@@ -99,8 +99,6 @@
       
       (make-initial-states)
       (dolist-tconc (product-state buf)
-        (format t "~&-------------------------~%")
-        (format t "~A~%" product-state)
 	(destructuring-bind (st1-from st2-from) (gethash product-state state->states)
           (let ((transitions1 (and st1-from (transitions st1-from)))
                 (transitions2 (and st2-from (transitions st2-from))))
@@ -129,21 +127,15 @@
                                (or next-state-1
                                    next-state-2))
                       (let ((next-product-state (product-state next-state-1 next-state-2)))
-                        (format t " transition=~A --> ~A~%" new-transition-label next-product-state)
-
                         (add-transition product-state :next-label (state-label next-product-state)
                                                       :transition-label new-transition-label))))))))))
-
-      (dolist (state (states sm-product))
-        (dolist (transition (transitions state))
-          (format t "~A --> ~A~%" state (next-state transition))))
       
       (dolist (final-state (get-final-states sm-product))
 	(destructuring-bind (st1-from st2-from) (gethash final-state state->states)
 	  (funcall final-state-callback final-state st1-from st2-from)))
 
       (when minimize
-        (minimize-state-machine sm-product))
+        (setf sm-product (minimize-state-machine sm-product)))
 
       (calc-sticky-states sm-product)
       sm-product

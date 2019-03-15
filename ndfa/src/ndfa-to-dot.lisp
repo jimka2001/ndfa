@@ -163,7 +163,6 @@ will be converted to a png file which will be displayed using open -n.  This wor
   (cond ((string= "dot" (pathname-type path))
          (ensure-directories-exist path)
 	 (with-open-file (stream path :direction :output :if-exists :rename)
-           (format t "writing to ~A~%" stream)
 	   (ndfa-to-dot ndfa stream :state-legend state-legend :transition-legend transition-legend :transition-abrevs transition-abrevs :transition-label-cb transition-label-cb :view nil :prefix prefix :title title :equal-transition-labels equal-transition-labels :state< state<)))
 	((string= "png" (pathname-type path))
 	 (let ((dotpath (merge-pathnames (make-pathname :type "dot")  path)))
