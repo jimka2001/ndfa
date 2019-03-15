@@ -73,6 +73,7 @@
                                        (incf transition-index)
                                        (setf proposed-name (format nil "T~d" transition-index)))
                                      (funcall transition-label-cb transition-label proposed-name)
+                                     (push (list transition-label proposed-name) transition-abrevs)
                                      proposed-name)))))             
 	     new-name))
          (state-label-for-dot (state)
