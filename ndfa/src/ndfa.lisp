@@ -23,6 +23,7 @@
   (:use :cl :adjuvant)
   (:nicknames "NDFA")
   (:export "ADD-STATE"
+           "CALC-STICKY-STATES"
            "CLAUSE-INDEX"
            "DETERMINISTICP"
            "FIND-TRANSIT"
@@ -129,6 +130,11 @@ an instance of class STATE-MACHINE."))
         (if (state-final-p state)
             t
             nil)))
+
+(defgeneric calc-sticky-states (sm))
+(defmethod calc-sticky-states ((sm state-machine))
+  (setf (get-sticky-states sm) nil))
+
 
 (defgeneric state-name (state))
 

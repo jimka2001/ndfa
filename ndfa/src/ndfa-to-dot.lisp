@@ -87,11 +87,19 @@ TRANSITION-ABREVS (a car/cadr alist) mapping type specifiers to symbolic labels.
 	  (setf (gethash (state-label state) state-map) state-num)
 	  (incf state-num)))
       (dolist (state states)
-	(format stream "  /* ~D */~%" (gethash (state-label state) state-map))
-	(unless state-legend
-	  ;; if state-legend is nil, that means we tell graphvis to diplay the
-	  ;;   name the states according to the state-label of the state.
-	  (format stream "  ~D [label=\"~A\"]~%" (gethash (state-label state) state-map) (state-label state)))
+	(format stream "  /* ~Astate ~D */~%"
+                (if (state-sticky-p state) "sticky " "")
+                (gethash (state-label state) state-map))
+        (cond
+          ((null state-legend)
+	   ;; if state-legend is nil, that means we tell graphvis to diplay the
+	   ;;   name the states according to the state-label of the state.
+	   (format stream "  ~D [label=\"~A\"" (gethash (state-label state) state-map) (state-label state))
+           (when (state-sticky-p state)
+             (format stream " style=dashed"))
+           (format stream "]~%"))
+          ((state-sticky-p state)
+           (format stream "  ~D [style=dashed]~%"  (gethash (state-label state) state-map))))
 	(when (state-initial-p state)
 	  (format stream "    H~D [label=\"\", style=invis, width=0]~%" hidden)
 	  (format stream "    H~D -> ~D;~%" hidden (gethash (state-label state) state-map))

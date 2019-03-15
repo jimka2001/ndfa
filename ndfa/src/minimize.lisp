@@ -332,9 +332,12 @@ RETURNS the given DFA perhaps after having some if its states removed."
 	(destructuring-bind (st1-from st2-from) (gethash final-state state->states)
 	  (funcall final-state-callback final-state st1-from st2-from)))
 
-      (if minimize
-          (minimize-state-machine sm-product)
-          sm-product))))
+      (when minimize
+        (minimize-state-machine sm-product))
+
+      (calc-sticky-states sm-product)
+      sm-product
+      )))
 
 (defgeneric synchronized-product (sm1 sm2 &key boolean-function minimize))
 
