@@ -101,16 +101,39 @@ RETURNS the given DFA perhaps after having some if its states removed."
     ;;    subset has the same (EQUAL) value of state-exit-form.
     (labels ((find-partition (state)
 	       (declare (type state state))
+               ;; find the element of PARTITIONS which STATE
+               ;; is a member/EQ of.
 	       (the cons
 		    (car (exists partition partitions
 			   (member state partition :test #'eq)))))
 	     (partition-transition (state)
+               ;; Return a list of plists, each having :WITH and :TO fields.
+               ;; Each :TO value is EQ to an element of PARTITIONS.
+               ;; Each :TO value is unique within the returned list.
+               ;; The :WITH values in the return list indicate transition
+               ;;    labels from the given STATE to the :TO partition.
+               ;;    If STATE has two or more transitions to different states
+               ;;    in the :TO partition, then their respective transition
+               ;;    labels have been merged using COMBINE-LABELS.
+               ;;    Exception, there is no such merging if COMBINE is nil.
+               ;; This returned list of plists, is ideal for using group-by
+               ;;    in the caller to refine the partition which STATE
+               ;;    is currently in.
 	       (declare (type state state))
-	       (mapcar (lambda (transition)
-			 (declare (type transition transition))
-			 (list  :with (transition-label transition)
-				:to (find-partition (next-state transition))))
-		       (transitions state)))
+               (let ((raw (mapcar (lambda (transition)
+			              (declare (type transition transition))
+			              (list  :with (transition-label transition)
+				             :to (find-partition (next-state transition))))
+		                  (transitions state))))
+                 
+                 (if combine
+                     ;; take states that are maped :TO the same partition,
+                     ;;   and combine the :WITH labels using COMBINE-LABELS
+                     (mapcar (destructuring-lambda ((to plists))
+                               (list :with (combine-labels (mapcar (getter :with) plists))
+                                     :to to))
+                             (group-by raw :key (getter :to) :test #'eq))
+                     raw)))
 	     (plist-equal (plist1 plist2)
 	       (declare (type (cons keyword cons) plist1 plist2))
 	       (and (eq (getf plist1 :to)
@@ -118,38 +141,50 @@ RETURNS the given DFA perhaps after having some if its states removed."
 		    (funcall equal-labels
 			     (getf plist1 :with)
 			     (getf plist2 :with))))
+             (combine-labels (transitions)
+               (reduce combine transitions
+		       :initial-value (car transitions)))
+             
 	     (refine-partition (partition)
-	       ;; Partition is a set (list of states) into one or more
+	       ;; Partition is a set (list of states) which have been determined
+               ;; in a previous step to be (n-1)-equivalent.  We wish to refine
+               ;; this partition further, into one or more
 	       ;; lists such that each resulting list has the property
-	       ;; that all its element have the same value of
+	       ;; that all its elements have the same value of
 	       ;; PARTITION-TRANSITION.  Here 'same' means contains the
 	       ;; same elements in some order. (NOT (SET-EXCLUSIVE-OR
 	       ;; ...))
-	       ;; 
-	       (let ((characterization (group-by partition
-						 :key #'partition-transition
-						 :test (lambda (plists1 plists2)
-							 (not (set-exclusive-or plists1 plists2
-										:test #'plist-equal))))))
-		 ;; characterization is a car/cadr alist mapping a
-		 ;; plist to a list of states which is a subset of
-		 ;; partition plist looks like ( :with ...  :to ...)
-		 (loop :for grouped-by-transitions :in characterization
-		       :collect (destructuring-bind (_plist equiv-states) grouped-by-transitions
-				  (declare (ignore _plist))
-				  ;; this call to SETOF creates a list with the same elements as equiv-states,
-				  ;;   but so that they are order in the same order as they are found
-				  ;;   in (STATES DFA).  This is so that FIXED-POINT can depend on the order
-				  ;;   and recognize when the same value has been returned twice from REFINE-PARTITIONS.
-				  (setof state (states dfa)
-				    (member state equiv-states :test #'eq))))))
+	       (mapcar (destructuring-lambda ((_plist equiv-states))
+                         (declare (ignore _plist))
+			 ;; this call to SETOF creates a list with the same elements as equiv-states,
+			 ;;   but so that they are order in the same order as they are found
+			 ;;   in (STATES DFA).  This is so that FIXED-POINT can depend on the order
+			 ;;   and recognize when the same value has been returned twice from REFINE-PARTITIONS.
+			 (setof state (states dfa)
+			   (member state equiv-states :test #'eq)))
+		       ;; group-by returna a characterization which is a car/cadr alist mapping a
+		       ;; plist to a list of states which is a subset of
+		       ;; partition plist looks like ( :with ...  :to ...)
+                       (group-by partition
+			         :key #'partition-transition
+			         :test (lambda (plists1 plists2)
+				         (not (set-exclusive-or plists1 plists2
+							        :test #'plist-equal))))))
 	     (min-clause-index (v1 v2)
 	       (cond ((null v1) v2)
 		     ((null v2) v1)
 		     (t
 		      (min v1 v2))))
-	     (refine-partitions (p)
-	       (setf partitions (mapcan #'refine-partition p))))
+	     (refine-partitions (p1)
+	       (setf partitions (mapcan #'(lambda (p2)
+                                            (cond
+                                              ((null p2) nil)
+                                              ;; if there is only one element, then no need to parition,
+                                              ;;   it is already partitions as far as it will go.
+                                              ((cdr p2) (refine-partition p2))
+                                              (t
+                                               (list p2))))
+                                        p1))))
 
       ;; Generate the partition by calling REFINE-PARTITIONS until we
       ;;   find a fixed-point each such iteration modifies the value
@@ -207,8 +242,7 @@ RETURNS the given DFA perhaps after having some if its states removed."
 				;;   e.g., fixnum + (and number (not fixnum)) = number
 				(add-transition from-state
 						:equal-label equal-labels
-						:transition-label (reduce combine (mapcar #'transition-label transitions)
-									  :initial-value (transition-label (car transitions)))
+						:transition-label (combine-labels (mapcar #'transition-label transitions))
 						:next-label to-label)
 				;; otherwise, make several transitions between the same two states,
 				;; each with a different transition label

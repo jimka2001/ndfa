@@ -147,7 +147,7 @@
   (apply #'ndfa-to-dot ndfa (pathname path) args))
 
 (defmethod ndfa-to-dot :around (ndfa (path null) &rest args &key view prefix &allow-other-keys)
-  "If NDFA-TO-DOT is called with NIL as second argument, and :VIEW T is give, then
+  "If NDFA-TO-DOT is called with NIL as second argument, and :VIEW T is given, then
 the .dot file will be printed to a temporary file in /tmp (see MAKE-TEMP-FILE)."
   (if view ;; and path==nil
       (apply #'ndfa-to-dot ndfa
