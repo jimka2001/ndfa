@@ -87,9 +87,13 @@
                         state<)))
 
       (when title
+        (format t "making title=~A~%" title)
         (format graph-label "~a" title))
       (format stream "  rankdir=LR;~%")
-      (format stream "  graph [labeljust=l,nojustify=true];~%")
+      (format stream "  graph [labeljust=l,nojustify=true")
+      (when title
+        (format stream ",label=~S" (get-output-stream-string graph-label)))
+      (format stream "];~%")
       (format stream "  node [fontname=Arial, fontsize=25];~%")
       (format stream "  edge [fontname=Helvetica, fontsize=20];~%")
       
