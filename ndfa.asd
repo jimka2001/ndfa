@@ -20,15 +20,17 @@
 ;; WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
-(asdf:defsystem :ndfa-test
-  :version (:read-file-form "../version.lisp")
+(asdf:defsystem :ndfa
+  :version (:read-file-form "version.lisp")
   :author "Jim Newton"
-  :description "Test cases for ndfa package/system"
+  :description "Implementation of non-deterministed finite automata"
   :license "MIT"
-  :depends-on (:ndfa
-	       :adjuvant
-	       :scrutiny)
+  :depends-on (:adjuvant)
   :components
   ((:module "src"
-      :components
-      ((:file "test-ndfa")))))
+    :components
+    ((:file "ndfa")
+     (:file "ndfa-to-dot" :depends-on ("ndfa"))
+     (:file "minimize" :depends-on ("ndfa"))
+     (:file "product" :depends-on ("ndfa"))
+     (:file "transit" :depends-on ("ndfa"))))))
